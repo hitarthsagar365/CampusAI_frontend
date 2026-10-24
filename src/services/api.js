@@ -1,5 +1,6 @@
 import axios from 'axios';
 
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://campusai-backend-1at3.onrender.com/api';
 // const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://campusai-backend-1at3.onrender.com';
 
