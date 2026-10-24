@@ -90,8 +90,12 @@ export default function Topbar({
           to={profilePath}
           className="flex items-center gap-2.5 pl-1.5 pr-2.5 py-1 rounded-full border border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/80 transition-all group"
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-xs shadow-xs ring-2 ring-white">
-            {initial}
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-xs shadow-xs ring-2 ring-white">
+            {currentUser?.avatar ? (
+              <img src={currentUser.avatar} alt={userName} className="w-full h-full object-cover" />
+            ) : (
+              initial
+            )}
           </div>
           <div className="hidden sm:flex flex-col text-left">
             <span className="text-xs font-bold text-slate-800 leading-tight group-hover:text-indigo-600 transition-colors">

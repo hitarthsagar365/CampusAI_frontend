@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Layout from '../../components/Layout';
-import { User, Bell, Shield, Palette, Link2, Save, CheckCircle2 } from 'lucide-react';
+import { User, Bell, Shield, Palette, Link2, Save, CheckCircle2, Camera, UploadCloud, AlertCircle, Loader2 } from 'lucide-react';
 import { DEPARTMENT_OPTIONS } from '../../constants/departments';
+import authService from '../../services/authService';
 
 export default function StudentSettings({ currentUser, setCurrentUser }) {
   const [tab, setTab] = useState('Account');
@@ -19,6 +20,82 @@ export default function StudentSettings({ currentUser, setCurrentUser }) {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState('');
+
+  // Profile Picture Upload State
+  const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(currentUser?.avatar || '');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Strict validation for .png, .jpg, .jpeg
+    const validExtensions = ['png', 'jpg', 'jpeg'];
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    const validMimes = ['image/png', 'image/jpeg', 'image/jpg'];
+
+    if (!validExtensions.includes(fileExt) || !validMimes.includes(file.type)) {
+      setUploadError('Invalid format! Strictly only .png, .jpg, and .jpeg files are accepted.');
+      setSelectedFile(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('File size exceeds 5MB limit. Please choose a smaller image.');
+      setSelectedFile(null);
+      return;
+    }
+
+    setUploadError('');
+    setSelectedFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+  };
+
+  const handleUploadAvatar = async () => {
+    if (!selectedFile) {
+      setUploadError('Please select a .png, .jpg, or .jpeg image first.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError('');
+    setSuccess('');
+
+    try {
+      const response = await authService.updateProfilePicture(selectedFile);
+      const newAvatarUrl = response.avatarUrl || response.user?.avatar;
+
+      if (setCurrentUser) {
+        setCurrentUser(response.user || {
+          ...currentUser,
+          avatar: newAvatarUrl
+        });
+      }
+
+      setPreviewUrl(newAvatarUrl);
+      setSelectedFile(null);
+      setSuccess('Profile picture uploaded to Cloudinary and updated successfully!');
+    } catch (err) {
+      console.error('Failed to upload profile picture:', err);
+      const message = err.response?.data?.message || err.message || 'Failed to upload image to Cloudinary.';
+      setUploadError(message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCancelSelection = () => {
+    setSelectedFile(null);
+    setPreviewUrl(currentUser?.avatar || '');
+    setUploadError('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Notifications State
   const [emailNotifs, setEmailNotifs] = useState(true);
@@ -133,7 +210,110 @@ export default function StudentSettings({ currentUser, setCurrentUser }) {
             <form onSubmit={handleSaveAccount} noValidate>
               <div className="border-b border-gray-100 pb-6 mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Student Account & Profile Details</h2>
-                <p className="text-xs text-gray-500 mt-1">Update your registered name, email, course, and semester.</p>
+                <p className="text-xs text-gray-500 mt-1">Update your profile photo, registered name, email, course, and semester.</p>
+              </div>
+
+              {/* Profile Picture Upload Section */}
+              <div className="p-5 mb-6 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row items-center gap-6">
+                <div className="relative group shrink-0">
+                  <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-tr from-indigo-500 to-violet-600 flex items-center justify-center text-white text-2xl font-bold shadow-md ring-4 ring-white">
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt="Student Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span>{(name || currentUser?.name || 'S').charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="absolute bottom-0 right-0 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg border-2 border-white transition-transform active:scale-95 cursor-pointer disabled:opacity-50"
+                    title="Change Profile Picture"
+                  >
+                    <Camera size={14} />
+                  </button>
+                </div>
+
+                <div className="flex-1 text-center sm:text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <h3 className="text-sm font-bold text-gray-900">Profile Picture</h3>
+                    <span className="text-[11px] font-medium text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full w-fit mx-auto sm:mx-0">
+                      Formats: .png, .jpg, .jpeg
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Upload an avatar image for your student portal. Strictly accepts <span className="font-semibold text-gray-700">.png, .jpg, and .jpeg</span> formats up to 5MB.
+                  </p>
+
+                  {/* Strict File Input element accepting only .png, .jpg, .jpeg */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    id="student-avatar-file-input"
+                    accept=".png, .jpg, .jpeg"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
+                  {uploadError && (
+                    <div className="mt-2.5 p-2.5 bg-red-50 border border-red-200 text-red-600 text-xs rounded-xl flex items-center gap-1.5 text-left">
+                      <AlertCircle size={14} className="shrink-0" />
+                      <span>{uploadError}</span>
+                    </div>
+                  )}
+
+                  <div className="mt-3.5 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="px-3.5 py-1.5 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Browse Image
+                    </button>
+
+                    {selectedFile && (
+                      <button
+                        type="button"
+                        onClick={handleUploadAvatar}
+                        disabled={isUploading}
+                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin" />
+                            <span>Uploading to Cloudinary...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud size={13} />
+                            <span>Upload Picture</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {selectedFile && !isUploading && (
+                      <button
+                        type="button"
+                        onClick={handleCancelSelection}
+                        className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 font-medium"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+
+                  {selectedFile && (
+                    <p className="text-[11px] text-indigo-600 mt-2 font-medium">
+                      Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-5">

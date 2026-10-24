@@ -48,6 +48,23 @@ export const authService = {
     return response.data.user;
   },
 
+  // Upload Profile Picture to Cloudinary via backend
+  async updateProfilePicture(file) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await api.post('/auth/profile-picture', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+
+    if (response.data?.user) {
+      localStorage.setItem('currentUser', JSON.stringify(response.data.user));
+    }
+    return response.data;
+  },
+
   // Get students (authenticated, with optional criteria params)
   async getStudents(params = {}) {
     const response = await api.get('/students', { params });

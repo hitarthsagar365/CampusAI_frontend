@@ -248,8 +248,12 @@ export default function Sidebar({
           {/* User Mini Profile */}
           <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200/70 shadow-xs mb-1">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                {(userName || 'U').charAt(0).toUpperCase()}
+              <div className="w-8 h-8 rounded-lg overflow-hidden bg-gradient-to-tr from-indigo-600 to-violet-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                {currentUser?.avatar ? (
+                  <img src={currentUser.avatar} alt={userName} className="w-full h-full object-cover" />
+                ) : (
+                  (userName || 'U').charAt(0).toUpperCase()
+                )}
               </div>
               <div className="min-w-0">
                 <span className="block text-xs font-bold text-slate-900 truncate">
