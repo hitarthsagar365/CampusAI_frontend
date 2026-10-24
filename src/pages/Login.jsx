@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { GraduationCap, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { DEPARTMENT_OPTIONS } from '../constants/departments';
 import authService from '../services/authService';
+import subjectService from '../services/subjectService';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login({ currentUser, setCurrentUser, students = [], setStudents, faculty = [], setFaculty }) {
@@ -11,6 +12,13 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
   const [viewMode, setViewMode] = useState('login'); // 'login' | 'reg_student' | 'reg_faculty'
   const [role, setRole] = useState('student');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Fetch subjects dynamically via @tanstack/react-query
+  const { data: subjects = [], isLoading: isSubjectsLoading } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => subjectService.getSubjects(),
+    staleTime: 5 * 60 * 1000
+  });
 
   // Login state
   const [identifier, setIdentifier] = useState('');
@@ -729,18 +737,43 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Assigned / Elective Subject *</label>
-                <input
-                  type="text"
-                  value={faAssignedSubject}
-                  onChange={(e) => {
-                    setFaAssignedSubject(e.target.value);
-                    if (faErrors.assignedSubject || faErrors.general) setFaErrors({});
-                  }}
-                  placeholder="e.g. MERN or ADA"
-                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 ${
-                    faErrors.assignedSubject ? 'border-red-500 focus:ring-red-500/20' : 'border-gray-200 focus:ring-indigo-500/20'
-                  }`}
-                />
+                <div className="relative">
+                  <select
+                    value={faAssignedSubject}
+                    onChange={(e) => {
+                      setFaAssignedSubject(e.target.value);
+                      if (faErrors.assignedSubject || faErrors.general) setFaErrors({});
+                    }}
+                    disabled={isSubjectsLoading}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-xs text-gray-900 bg-white focus:outline-none focus:ring-2 ${
+                      faErrors.assignedSubject
+                        ? 'border-red-500 focus:ring-red-500/20'
+                        : 'border-gray-200 focus:ring-indigo-500/20'
+                    } ${isSubjectsLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  >
+                    <option value="">
+                      {isSubjectsLoading ? 'Loading subjects...' : '-- Select Assigned Subject --'}
+                    </option>
+                    {Array.isArray(subjects) && subjects.length > 0 ? (
+                      subjects.map((subj) => {
+                        const sName = subj.name || subj.subjectName || subj.title || '';
+                        const sCode = subj.code || subj.subjectCode || '';
+                        return (
+                          <option key={subj._id || subj.id || sName} value={sName}>
+                            {sName} {sCode ? `(${sCode})` : ''} {subj.dept ? `— ${subj.dept}` : ''}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      !isSubjectsLoading && <option value="" disabled>No subjects available</option>
+                    )}
+                  </select>
+                  {isSubjectsLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Loader2 size={14} className="animate-spin text-gray-400" />
+                    </div>
+                  )}
+                </div>
                 {faErrors.assignedSubject && <p className="text-xs text-red-500 font-medium mt-1">{faErrors.assignedSubject}</p>}
               </div>
 

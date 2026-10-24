@@ -1,11 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   GraduationCap, Building2, Search, Filter, RotateCcw,
   LayoutGrid, List, Plus, Check, Mail, BookOpen, Layers,
-  Pencil, Trash2, X, AlertTriangle, ChevronLeft, ChevronRight
+  Pencil, Trash2, X, AlertTriangle, ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { DEPARTMENT_OPTIONS } from '../constants/departments';
 import facultyService from '../services/facultyService';
+import subjectService from '../services/subjectService';
 import ConfirmModal from './common/ConfirmModal';
 import Toast from './common/Toast';
 
@@ -26,6 +28,13 @@ export default function FacultyDirectorySection({
   faSuccess,
   handleAddFaculty
 }) {
+  // Fetch available subjects dynamically via react-query
+  const { data: subjects = [], isLoading: isSubjectsLoading } = useQuery({
+    queryKey: ['subjects'],
+    queryFn: () => subjectService.getSubjects(),
+    staleTime: 5 * 60 * 1000
+  });
+
   // Local synchronized faculty list state
   const [facultyList, setFacultyList] = useState(faculty);
 
@@ -453,18 +462,41 @@ export default function FacultyDirectorySection({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Assigned Subject *</label>
-                <input
-                  type="text"
-                  value={faAssignedSubject}
-                  onChange={(e) => {
-                    setFaAssignedSubject(e.target.value);
-                    if (faErrors.assignedSubject) setFaErrors({ ...faErrors, assignedSubject: '' });
-                  }}
-                  placeholder="e.g. MERN Stack or Cloud Computing"
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 ${
-                    faErrors.assignedSubject ? 'border-red-500' : 'border-slate-200'
-                  }`}
-                />
+                <div className="relative">
+                  <select
+                    value={faAssignedSubject}
+                    onChange={(e) => {
+                      setFaAssignedSubject(e.target.value);
+                      if (faErrors.assignedSubject) setFaErrors({ ...faErrors, assignedSubject: '' });
+                    }}
+                    disabled={isSubjectsLoading}
+                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 ${
+                      faErrors.assignedSubject ? 'border-red-500' : 'border-slate-200'
+                    } ${isSubjectsLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                  >
+                    <option value="">
+                      {isSubjectsLoading ? 'Loading subjects...' : '-- Select Assigned Subject --'}
+                    </option>
+                    {Array.isArray(subjects) && subjects.length > 0 ? (
+                      subjects.map((subj) => {
+                        const sName = subj.name || subj.subjectName || subj.title || '';
+                        const sCode = subj.code || subj.subjectCode || '';
+                        return (
+                          <option key={subj._id || subj.id || sName} value={sName}>
+                            {sName} {sCode ? `(${sCode})` : ''} {subj.dept ? `— ${subj.dept}` : ''}
+                          </option>
+                        );
+                      })
+                    ) : (
+                      !isSubjectsLoading && <option value="" disabled>No subjects available</option>
+                    )}
+                  </select>
+                  {isSubjectsLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Loader2 size={14} className="animate-spin text-slate-400" />
+                    </div>
+                  )}
+                </div>
                 {faErrors.assignedSubject && <p className="text-[11px] text-red-500 font-medium mt-1">{faErrors.assignedSubject}</p>}
               </div>
             </div>
@@ -1116,13 +1148,35 @@ export default function FacultyDirectorySection({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Subject</label>
-                <input
-                  type="text"
-                  value={modalForm.assignedSubject}
-                  onChange={(e) => setModalForm({ ...modalForm, assignedSubject: e.target.value })}
-                  placeholder="e.g. Deep Learning, Data Structures"
-                  className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
-                />
+                <div className="relative">
+                  <select
+                    value={modalForm.assignedSubject}
+                    onChange={(e) => setModalForm({ ...modalForm, assignedSubject: e.target.value })}
+                    disabled={isSubjectsLoading}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
+                  >
+                    <option value="">
+                      {isSubjectsLoading ? 'Loading subjects...' : '-- Select Assigned Subject --'}
+                    </option>
+                    {modalForm.assignedSubject && !subjects.some(s => (s.name || s.subjectName || s.title) === modalForm.assignedSubject) && (
+                      <option value={modalForm.assignedSubject}>{modalForm.assignedSubject} (Current)</option>
+                    )}
+                    {Array.isArray(subjects) && subjects.map((subj) => {
+                      const sName = subj.name || subj.subjectName || subj.title || '';
+                      const sCode = subj.code || subj.subjectCode || '';
+                      return (
+                        <option key={subj._id || subj.id || sName} value={sName}>
+                          {sName} {sCode ? `(${sCode})` : ''} {subj.dept ? `— ${subj.dept}` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {isSubjectsLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Loader2 size={14} className="animate-spin text-slate-400" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
