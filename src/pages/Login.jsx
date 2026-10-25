@@ -359,6 +359,7 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
                 )}
               </div>
 
+              <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-semibold text-gray-700">Password</label>
                   <Link
