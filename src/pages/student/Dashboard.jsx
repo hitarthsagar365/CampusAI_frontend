@@ -182,11 +182,21 @@ export default function StudentDashboard({
   const attendedCount = hasAttendanceData ? attendanceData.overallStats.totalAttended : 0;
   const conductedCount = hasAttendanceData ? attendanceData.overallStats.totalConducted : 0;
 
-  // Performance metrics from real data
-  const hasPerformanceData = !!(performanceData?.summary && performanceData.summary.totalSubjects > 0);
-  const studentGpa = hasPerformanceData ? (performanceData.summary.gpa ?? performanceData.summary.cgpa) : null;
-  const studentAvgMarks = hasPerformanceData ? performanceData.summary.overallPercentage : null;
-  const studentSubjectCount = hasPerformanceData ? performanceData.summary.totalSubjects : 0;
+  // Performance metrics from real data (strictly capped at 10.0 scale)
+  const hasPerformanceData = !!(
+    (performanceData?.summary && (performanceData.summary.totalSubjects > 0 || performanceData.summary.totalEvaluations > 0)) ||
+    (performanceData?.metrics && (performanceData.metrics.totalEvaluations > 0 || performanceData.metrics.overallPercentage > 0))
+  );
+  const rawGpa = performanceData?.metrics?.cgpa ?? performanceData?.summary?.gpa ?? performanceData?.summary?.cgpa;
+  const studentGpa = hasPerformanceData && rawGpa !== undefined && rawGpa !== null
+    ? Math.min(Math.max(Number(rawGpa), 0), 10.0).toFixed(2)
+    : null;
+  const studentAvgMarks = hasPerformanceData
+    ? Math.min(Number(performanceData?.metrics?.overallPercentage ?? performanceData?.summary?.overallPercentage ?? 0), 100)
+    : null;
+  const studentSubjectCount = hasPerformanceData
+    ? (performanceData?.summary?.totalSubjects ?? performanceData?.currentSemesterSubjects?.length ?? 0)
+    : 0;
 
   const generateTimetablePDF = () => {
     generateWeeklyTimetablePDF({
@@ -625,6 +635,13 @@ export default function StudentDashboard({
                   {studentGpa}
                 </span>
                 <span className="text-[11px] text-indigo-600 font-semibold mt-0.5 block">10.0 Scale</span>
+                {/* Strictly Bounded GPA Progress Bar (Scale: 0 to 10.0) */}
+                <div className="w-full bg-indigo-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                  <div
+                    className="bg-indigo-600 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min((Number(studentGpa || 0) / 10.0) * 100, 100)}%` }}
+                  />
+                </div>
               </div>
               <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100/60">
                 <span className="text-xs text-gray-500 font-medium block">Overall Average</span>

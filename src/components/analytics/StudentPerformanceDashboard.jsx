@@ -253,13 +253,23 @@ export default function StudentPerformanceDashboard({
   const CustomLineTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const cappedSgpa =
+        data.sgpa !== undefined && data.sgpa !== null
+          ? Math.min(Math.max(Number(data.sgpa), 0), 10.0).toFixed(2)
+          : null;
       return (
         <div className="bg-white/95 backdrop-blur-md p-3 rounded-xl border border-slate-200/80 shadow-xl text-xs space-y-1 z-50">
           <p className="font-bold text-slate-900 border-b border-slate-100 pb-1">{data.semester || label}</p>
           <div className="flex items-center justify-between gap-4 text-indigo-600 font-semibold">
             <span>Score:</span>
-            <span>{data.percentage}%</span>
+            <span>{Math.min(Number(data.percentage || 0), 100)}%</span>
           </div>
+          {cappedSgpa !== null && (
+            <div className="flex items-center justify-between gap-4 text-emerald-600 font-semibold">
+              <span>SGPA (Max 10.0):</span>
+              <span>{cappedSgpa} / 10.0</span>
+            </div>
+          )}
           {data.totalObtained !== undefined && data.totalMax !== undefined && (
             <div className="flex items-center justify-between gap-4 text-slate-500">
               <span>Aggregate:</span>
@@ -501,30 +511,54 @@ export default function StudentPerformanceDashboard({
           {/* ================================================================= */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Metric 1: Overall Percentage / CGPA */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:shadow-sm transition-all relative overflow-hidden group">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Overall Percentage
-                </span>
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs">
-                  <Award size={18} />
+            {(() => {
+              const rawCgpa = performanceData.metrics.cgpa;
+              const safeCgpa = Math.min(Math.max(Number(rawCgpa || 0), 0), 10.0);
+              const cgpaFormatted = safeCgpa.toFixed(2);
+              const cgpaProgressWidth = Math.min((safeCgpa / 10.0) * 100, 100);
+
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:shadow-sm transition-all relative overflow-hidden group">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Overall Percentage
+                    </span>
+                    <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs">
+                      <Award size={18} />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-slate-900 tracking-tight">
+                      {performanceData.metrics.overallPercentage}%
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold" title="Capped strictly at 10.0 scale">
+                      {cgpaFormatted} CGPA
+                    </span>
+                  </div>
+
+                  {/* Strictly Bounded CGPA Progress Bar (Scale: 0 to 10.0) */}
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 mb-1">
+                      <span>CGPA (10.0 Scale)</span>
+                      <span className="text-indigo-600 font-bold">{cgpaFormatted} / 10.0</span>
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-indigo-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${cgpaProgressWidth}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                    <span className="font-medium">Total Evaluations:</span>
+                    <span className="font-bold text-slate-800">
+                      {performanceData.metrics.totalEvaluations} records
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-3xl font-black text-slate-900 tracking-tight">
-                  {performanceData.metrics.overallPercentage}%
-                </span>
-                <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold">
-                  {performanceData.metrics.cgpa} CGPA
-                </span>
-              </div>
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
-                <span className="font-medium">Total Evaluations:</span>
-                <span className="font-bold text-slate-800">
-                  {performanceData.metrics.totalEvaluations} records
-                </span>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Metric 2: Strongest Subject */}
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs hover:shadow-sm transition-all relative overflow-hidden group">
