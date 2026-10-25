@@ -9,16 +9,11 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Login({ currentUser, setCurrentUser, students = [], setStudents, faculty = [], setFaculty }) {
   const { login } = useAuth();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('login'); // 'login' | 'reg_student' | 'reg_faculty'
   const [role, setRole] = useState('student');
   const [showPassword, setShowPassword] = useState(false);
-
-  // Requirement 3: Cascading subjects query filtered dynamically by selected faculty department/course
-  const { data: subjects = [], isLoading: isSubjectsLoading } = useQuery({
-    queryKey: ['subjects', faDepartment],
-    queryFn: () => (faDepartment ? subjectService.getSubjectsByCourse(faDepartment) : subjectService.getSubjects()),
-    staleTime: 5 * 60 * 1000
-  });
+  const [successMsg, setSuccessMsg] = useState('');
 
   // Login state
   const [identifier, setIdentifier] = useState('');
@@ -46,8 +41,12 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
   const [faPassword, setFaPassword] = useState('');
   const [faErrors, setFaErrors] = useState({});
 
-  const [successMsg, setSuccessMsg] = useState('');
-  const navigate = useNavigate();
+  // Requirement 3: Cascading subjects query filtered dynamically by selected faculty department/course
+  const { data: subjects = [], isLoading: isSubjectsLoading } = useQuery({
+    queryKey: ['subjects', faDepartment],
+    queryFn: () => (faDepartment ? subjectService.getSubjectsByCourse(faDepartment) : subjectService.getSubjects()),
+    staleTime: 5 * 60 * 1000
+  });
 
   // Mutations
   const loginMutation = useMutation({
