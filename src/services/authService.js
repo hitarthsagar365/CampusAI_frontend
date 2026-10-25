@@ -99,6 +99,21 @@ export const authService = {
     localStorage.removeItem('currentUser');
   },
 
+  // Forgot Password: sends password reset email with token
+  async forgotPassword(email) {
+    const response = await api.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  // Reset Password: submit new password with token from URL param
+  async resetPassword(token, password, confirmPassword) {
+    const response = await api.post(`/auth/reset-password/${token}`, {
+      password,
+      confirmPassword
+    });
+    return response.data;
+  },
+
   // Check if access token is present
   isAuthenticated() {
     return Boolean(getAccessToken());

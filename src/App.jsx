@@ -19,6 +19,8 @@ import announcementService from './services/announcementService';
 
 // Public & Auth Pages (Lazy-Loaded)
 const Login = lazy(() => import('./pages/Login'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 
 // Student Pages (Lazy-Loaded)
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'));
@@ -215,6 +217,22 @@ function AppContent() {
                 faculty={faculty}
                 setFaculty={setFaculty}
               />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PublicRoute>
+              <ForgotPassword />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/reset-password/:token"
+          element={
+            <PublicRoute>
+              <ResetPassword />
             </PublicRoute>
           }
         />

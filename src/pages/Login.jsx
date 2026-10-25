@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { GraduationCap, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { DEPARTMENT_OPTIONS } from '../constants/departments';
@@ -359,8 +359,15 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Password</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-gray-700">Password</label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
