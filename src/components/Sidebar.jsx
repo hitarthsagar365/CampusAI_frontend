@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Megaphone, ClipboardList, FolderKanban,
   SlidersHorizontal, BookOpen, MessageSquare,
-  User, Settings, HelpCircle, LogOut, Plus, GraduationCap,
+  User, Settings, HelpCircle, LogOut, GraduationCap,
   BookMarked, Calendar, CalendarDays, X, BarChart3
 } from 'lucide-react';
 
@@ -151,16 +151,6 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Quick Action Button */}
-        <div className="px-4 pt-3 pb-2">
-          <button
-            type="button"
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-xs font-semibold py-2.5 px-3 rounded-xl shadow-sm shadow-indigo-600/25 transition-all duration-150 hover:shadow-md active:scale-[0.99]"
-          >
-            <Plus size={15} className="stroke-[2.5]" />
-            <span>Quick Create Entry</span>
-          </button>
-        </div>
 
         {/* Navigation Links Area */}
         <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-4">

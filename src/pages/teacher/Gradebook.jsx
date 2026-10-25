@@ -6,22 +6,38 @@ import markService from '../../services/markService';
 import attendanceService from '../../services/attendanceService';
 import BulkMarksEntryGrid from '../../components/BulkMarksEntryGrid';
 import StudentPerformanceDashboard from '../../components/analytics/StudentPerformanceDashboard';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 export default function TeacherGradebook({ currentUser, marks = [], setMarks, students = [] }) {
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'bulk' | 'history'
 
   // Fetch assigned subjects for this faculty
-  const { data: mySubjects = [] } = useQuery({
+  const { data: rawMySubjects = [] } = useQuery({
     queryKey: ['mySubjects'],
-    queryFn: () => attendanceService.getMySubjects()
+    queryFn: async () => {
+      try {
+        const res = await attendanceService.getMySubjects();
+        return Array.isArray(res) ? res : [];
+      } catch (e) {
+        return [];
+      }
+    }
   });
+  const mySubjects = Array.isArray(rawMySubjects) ? rawMySubjects : [];
 
   // Fetch marks for history tab
-  const { data: dbMarks = [] } = useQuery({
+  const { data: rawDbMarks = [] } = useQuery({
     queryKey: ['marks'],
-    queryFn: () => markService.getMarks()
+    queryFn: async () => {
+      try {
+        const res = await markService.getMarks();
+        return Array.isArray(res) ? res : [];
+      } catch (e) {
+        return [];
+      }
+    }
   });
-  const rawMarks = Array.isArray(dbMarks) ? dbMarks : [];
+  const rawMarks = Array.isArray(rawDbMarks) ? rawDbMarks : [];
 
   // Filter marks for this faculty's subjects or enteredBy
   const mySubjectNames = mySubjects.map((s) => (s.subject || '').toLowerCase());
@@ -86,19 +102,20 @@ export default function TeacherGradebook({ currentUser, marks = [], setMarks, st
       </div>
 
       {/* Main Tab Content */}
-      {activeTab === 'analytics' ? (
-        <StudentPerformanceDashboard
-          role="faculty"
-          currentUser={currentUser}
-          embedded={true}
-        />
-      ) : activeTab === 'bulk' ? (
-        <BulkMarksEntryGrid
-          currentUser={currentUser}
-          role="faculty"
-          onMarksSaved={() => {}}
-        />
-      ) : (
+      <ErrorBoundary title="Gradebook & Performance Error">
+        {activeTab === 'analytics' ? (
+          <StudentPerformanceDashboard
+            role="faculty"
+            currentUser={currentUser}
+            embedded={true}
+          />
+        ) : activeTab === 'bulk' ? (
+          <BulkMarksEntryGrid
+            currentUser={currentUser}
+            role="faculty"
+            onMarksSaved={() => {}}
+          />
+        ) : (
         <div className="bg-white rounded-2xl border border-gray-200/80 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -227,6 +244,7 @@ export default function TeacherGradebook({ currentUser, marks = [], setMarks, st
           )}
         </div>
       )}
+      </ErrorBoundary>
     </Layout>
   );
 }

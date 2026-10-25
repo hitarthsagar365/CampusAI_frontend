@@ -28,6 +28,7 @@ import BulkMarksEntryGrid from '../../components/BulkMarksEntryGrid';
 import StudentPerformanceDashboard from '../../components/analytics/StudentPerformanceDashboard';
 import SubjectManagementSection from '../../components/SubjectManagementSection';
 import ChatInterface from '../../components/chat/ChatInterface';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 export default function AdminDashboard({
   currentUser,
@@ -1566,18 +1567,20 @@ export default function AdminDashboard({
             </button>
           </div>
         </div>
-        {adminMarksTab === 'analytics' ? (
-          <StudentPerformanceDashboard
-            role="admin"
-            currentUser={currentUser}
-            embedded={true}
-          />
-        ) : (
-          <BulkMarksEntryGrid
-            currentUser={currentUser}
-            role="admin"
-          />
-        )}
+        <ErrorBoundary title="Bulk Marks Entry Grid Error">
+          {adminMarksTab === 'analytics' ? (
+            <StudentPerformanceDashboard
+              role="admin"
+              currentUser={currentUser}
+              embedded={true}
+            />
+          ) : (
+            <BulkMarksEntryGrid
+              currentUser={currentUser}
+              role="admin"
+            />
+          )}
+        </ErrorBoundary>
       </Layout>
     );
   }

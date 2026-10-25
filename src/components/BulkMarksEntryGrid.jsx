@@ -70,40 +70,62 @@ export default function BulkMarksEntryGrid({
   const isAdmin = (role || currentUser?.role || '').toLowerCase() === 'admin';
 
   // ============================================================================
-  // 1. DATA SOURCES: Faculty Subject Assignments & Admin Subjects
+  // 1. DATA SOURCES: Faculty Subject Assignments
   // ============================================================================
-  const { data: mySubjects = [] } = useQuery({
+  const { data: rawMySubjects = [], isLoading: loadingMySubjects } = useQuery({
     queryKey: ['mySubjects'],
-    queryFn: () => attendanceService.getMySubjects(),
+    queryFn: async () => {
+      try {
+        const res = await attendanceService.getMySubjects();
+        return Array.isArray(res) ? res : [];
+      } catch (err) {
+        console.warn('[BulkMarksEntry] Could not fetch mySubjects:', err?.message);
+        return [];
+      }
+    },
     enabled: !isAdmin
   });
-
-  const { data: adminSubjects = [] } = useQuery({
-    queryKey: ['adminSubjects', selectedDepartment, selectedSemester],
-    queryFn: () => academicService.getSubjectsByCourseAndSemester(selectedDepartment, selectedSemester),
-    enabled: isAdmin && !!selectedDepartment && !!selectedSemester
-  });
+  const mySubjects = useMemo(() => (Array.isArray(rawMySubjects) ? rawMySubjects : []), [rawMySubjects]);
 
   // ============================================================================
   // 2. CRITERIA & RBAC CONSTRAINTS
   // ============================================================================
   const facultyDept = currentUser?.department && currentUser.department !== 'All Departments'
     ? currentUser.department
-    : (mySubjects[0]?.department || 'AIML');
+    : (mySubjects?.[0]?.department || 'AIML');
 
   // Normalize semester string/number
   const initialSem = isAdmin
     ? '8'
-    : String(currentUser?.semester || mySubjects[0]?.semester || '6').replace(/[^0-9]/g, '') || '6';
+    : String(currentUser?.semester || mySubjects?.[0]?.semester || '6').replace(/[^0-9]/g, '') || '6';
 
   const [selectedDepartment, setSelectedDepartment] = useState(
     isAdmin ? 'Cyber Security' : facultyDept
   );
   const [selectedSemester, setSelectedSemester] = useState(initialSem);
   const [selectedDivision, setSelectedDivision] = useState(
-    isAdmin ? 'General' : (currentUser?.classSection || currentUser?.section || mySubjects[0]?.classSection || 'General')
+    isAdmin ? 'General' : (currentUser?.classSection || currentUser?.section || mySubjects?.[0]?.classSection || 'General')
   );
   const [selectedSubject, setSelectedSubject] = useState('');
+
+  // ============================================================================
+  // 3. ADMIN DATA SOURCE: Subjects for Selected Course & Semester (Declared after state)
+  // ============================================================================
+  const { data: rawAdminSubjects = [], isLoading: loadingAdminSubjects } = useQuery({
+    queryKey: ['adminSubjects', selectedDepartment, selectedSemester],
+    queryFn: async () => {
+      try {
+        if (!selectedDepartment || !selectedSemester) return [];
+        const res = await academicService.getSubjectsByCourseAndSemester(selectedDepartment, selectedSemester);
+        return Array.isArray(res) ? res : [];
+      } catch (err) {
+        console.warn('[BulkMarksEntry] Could not fetch admin subjects:', err?.message);
+        return [];
+      }
+    },
+    enabled: isAdmin && !!selectedDepartment && !!selectedSemester
+  });
+  const adminSubjects = useMemo(() => (Array.isArray(rawAdminSubjects) ? rawAdminSubjects : []), [rawAdminSubjects]);
 
   // Faculty: locked strictly to 'Mid Term' and 30 marks
   // Admin: selectable 'Mid Term' / 'Final Exam' and custom marks
@@ -116,7 +138,7 @@ export default function BulkMarksEntryGrid({
   const [searchTerm, setSearchTerm] = useState('');
 
   // ============================================================================
-  // 3. STUDENT STATE & DIRECT API FETCH LOGIC
+  // 4. STUDENT STATE & DIRECT API FETCH LOGIC
   // ============================================================================
   const [students, setStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
@@ -161,7 +183,7 @@ export default function BulkMarksEntryGrid({
         if (s) sems.add(s);
       }
       mySubjects.forEach((sub) => {
-        if (sub.semester) {
+        if (sub?.semester) {
           const s = String(sub.semester).replace(/[^0-9]/g, '');
           if (s) sems.add(s);
         }
@@ -174,10 +196,10 @@ export default function BulkMarksEntryGrid({
   const availableDivisions = useMemo(() => {
     if (!isAdmin) {
       const divs = new Set();
-      const userDiv = (currentUser?.classSection || currentUser?.section || '').trim();
+      const userDiv = String(currentUser?.classSection || currentUser?.section || '').trim();
       if (userDiv) divs.add(userDiv.replace(/^(Section|Division)\s+/i, ''));
       mySubjects.forEach((s) => {
-        const div = (s.classSection || '').trim().replace(/^(Section|Division)\s+/i, '');
+        const div = String(s?.classSection || '').trim().replace(/^(Section|Division)\s+/i, '');
         if (div) divs.add(div);
       });
       return divs.size > 0 ? Array.from(divs).sort() : ['General', 'A', 'B'];
@@ -189,12 +211,17 @@ export default function BulkMarksEntryGrid({
     if (!isAdmin) {
       const subs = mySubjects
         .filter((s) => {
-          const deptMatch = !s.department || s.department.toLowerCase() === (selectedDepartment || '').toLowerCase();
+          if (!s) return false;
+          const deptMatch = !s.department || String(s.department).toLowerCase() === String(selectedDepartment || '').toLowerCase();
           const sSem = String(s.semester || '').replace(/[^0-9]/g, '');
-          const semMatch = !sSem || sSem === String(selectedSemester || '');
+          const semMatch = !sSem || !selectedSemester || sSem === String(selectedSemester || '');
           return deptMatch && semMatch;
         })
-        .map((s) => s.subject);
+        .map((s) => {
+          if (typeof s?.subject === 'object') return s.subject?.name || s.subject?.title;
+          return s?.subject || s?.name;
+        })
+        .filter(Boolean);
 
       if (subs.length === 0 && currentUser?.assignedSubject) {
         return [currentUser.assignedSubject];
@@ -202,23 +229,32 @@ export default function BulkMarksEntryGrid({
       return subs.length > 0 ? Array.from(new Set(subs)) : [];
     }
 
-    const systemSubs = adminSubjects.map((s) => s.name || s.subject || s.title).filter(Boolean);
+    const systemSubs = adminSubjects
+      .map((s) => {
+        if (typeof s === 'string') return s;
+        return s?.name || s?.subject || s?.title;
+      })
+      .filter(Boolean);
     return Array.from(new Set(systemSubs));
   }, [isAdmin, mySubjects, adminSubjects, currentUser, selectedDepartment, selectedSemester]);
 
   useEffect(() => {
-    if (availableSubjects.length > 0 && (!selectedSubject || !availableSubjects.includes(selectedSubject))) {
-      setSelectedSubject(availableSubjects[0]);
+    if (availableSubjects.length > 0) {
+      if (!selectedSubject || !availableSubjects.includes(selectedSubject)) {
+        setSelectedSubject(availableSubjects[0]);
+      }
+    } else {
+      setSelectedSubject('');
     }
   }, [availableSubjects, selectedSubject]);
 
   useEffect(() => {
-    const deptSlug = (selectedDepartment || 'aiml').toLowerCase().replace(/\s+/g, '');
+    const deptSlug = String(selectedDepartment || 'aiml').toLowerCase().replace(/\s+/g, '');
     setEmailRecipient(`hod.${deptSlug}@campus.edu`);
   }, [selectedDepartment]);
 
   // ============================================================================
-  // 4. FETCH STUDENTS FUNCTION & EFFECT (TRIGGERS ONLY ON SELECTION)
+  // 5. FETCH STUDENTS FUNCTION & EFFECT (TRIGGERS ONLY ON SELECTION)
   // ============================================================================
   const fetchStudents = useCallback(async () => {
     // Only trigger backend fetch if required criteria dropdowns are selected
@@ -247,7 +283,9 @@ export default function BulkMarksEntryGrid({
         params: {
           department: selectedDepartment,
           semester: selectedSemester,
-          division: selectedDivision
+          division: selectedDivision,
+          section: selectedDivision,
+          classSection: selectedDivision
         }
       });
 
@@ -268,19 +306,23 @@ export default function BulkMarksEntryGrid({
           });
           if (Array.isArray(existingMarks)) {
             existingMarks.forEach((m) => {
-              const key = (m.enrollment || m.student || '').trim().toLowerCase();
-              if (key) existingMarksMap.set(key, m);
+              if (!m) return;
+              const enrollKey = String(m.enrollment || '').trim().toLowerCase();
+              const studentKey = String(m.student?.name || m.student || '').trim().toLowerCase();
+              if (enrollKey) existingMarksMap.set(enrollKey, m);
+              if (studentKey) existingMarksMap.set(studentKey, m);
             });
           }
         } catch (mErr) {
-          console.warn('[BulkMarksEntry] Could not fetch existing marks:', mErr.message);
+          console.warn('[BulkMarksEntry] Could not fetch existing marks:', mErr?.message);
         }
       }
 
       // 3. Map students into evaluation roster state
       const mappedStudents = studentList.map((stu) => {
-        const studentEnroll = (stu.enrollment || stu.username || stu.id || stu._id || '').trim();
-        const studentName = stu.name || 'Student';
+        if (!stu) return null;
+        const studentEnroll = String(stu.enrollment || stu.username || stu.id || stu._id || '').trim();
+        const studentName = String(stu.name || 'Student');
         const existing = existingMarksMap.get(studentEnroll.toLowerCase()) ||
                          existingMarksMap.get(studentName.toLowerCase());
 
@@ -291,7 +333,7 @@ export default function BulkMarksEntryGrid({
         if (existing) {
           if (existing.attendanceStatus) {
             attendance = existing.attendanceStatus;
-          } else if (String(existing.score).toUpperCase() === 'AB') {
+          } else if (String(existing.score || '').toUpperCase() === 'AB') {
             attendance = 'Absent';
           }
 
@@ -299,14 +341,14 @@ export default function BulkMarksEntryGrid({
             marks = 'AB';
             grade = 'AB';
           } else {
-            const parsedScore = String(existing.score || '').split('/')[0].trim();
+            const parsedScore = String(existing.score || existing.marks || '').split('/')[0].trim();
             marks = parsedScore;
             grade = existing.grade || calculateGrade(parsedScore, maxMarks, false);
           }
         }
 
         return {
-          _id: stu._id || stu.id,
+          _id: stu._id || stu.id || studentEnroll,
           enrollment: studentEnroll,
           name: studentName,
           attendance,
@@ -314,7 +356,7 @@ export default function BulkMarksEntryGrid({
           grade,
           validationError: ''
         };
-      });
+      }).filter(Boolean);
 
       console.log(`[BulkMarksEntry] Mapped ${mappedStudents.length} students into state.`);
       setStudents(mappedStudents);
@@ -432,14 +474,16 @@ export default function BulkMarksEntryGrid({
   // 6. STATISTICS & FILTERED ROWS
   // ============================================================================
   const stats = useMemo(() => {
-    const total = students.length;
+    const list = Array.isArray(students) ? students : [];
+    const total = list.length;
     let presentCount = 0;
     let absentCount = 0;
     let filledCount = 0;
     let totalMarks = 0;
     let passCount = 0;
 
-    students.forEach((row) => {
+    list.forEach((row) => {
+      if (!row) return;
       if (row.attendance === 'Absent') {
         absentCount++;
       } else {
@@ -469,12 +513,13 @@ export default function BulkMarksEntryGrid({
   }, [students, maxMarks]);
 
   const displayedStudents = useMemo(() => {
-    if (!searchTerm.trim()) return students;
+    const list = Array.isArray(students) ? students : [];
+    if (!searchTerm?.trim()) return list;
     const term = searchTerm.toLowerCase();
-    return students.filter(
+    return list.filter(
       (s) =>
-        s.enrollment.toLowerCase().includes(term) ||
-        s.name.toLowerCase().includes(term)
+        String(s?.enrollment || '').toLowerCase().includes(term) ||
+        String(s?.name || '').toLowerCase().includes(term)
     );
   }, [students, searchTerm]);
 
@@ -786,10 +831,10 @@ export default function BulkMarksEntryGrid({
             </label>
             <select
               value={selectedSubject}
-              disabled={!selectedDepartment || !selectedSemester}
+              disabled={!selectedDepartment || !selectedSemester || (isAdmin && loadingAdminSubjects) || (!isAdmin && loadingMySubjects)}
               onChange={(e) => setSelectedSubject(e.target.value)}
               className={`w-full px-2.5 py-1.5 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 truncate transition-colors ${
-                !selectedDepartment || !selectedSemester
+                !selectedDepartment || !selectedSemester || (isAdmin && loadingAdminSubjects) || (!isAdmin && loadingMySubjects)
                   ? 'bg-gray-100/70 border-gray-200 text-gray-400 cursor-not-allowed'
                   : 'bg-white border border-gray-300 text-gray-900'
               }`}
@@ -799,6 +844,8 @@ export default function BulkMarksEntryGrid({
                   ? '-- Select Dept first --'
                   : !selectedSemester
                   ? '-- Select Semester first --'
+                  : (isAdmin && loadingAdminSubjects) || (!isAdmin && loadingMySubjects)
+                  ? 'Loading subjects...'
                   : availableSubjects.length === 0
                   ? '-- No subjects found --'
                   : '-- Select Subject --'}

@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 import authService from './services/authService';
 import noticeService from './services/noticeService';
@@ -187,8 +188,9 @@ function AppContent() {
 
   return (
     <Router>
-      <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
+      <ErrorBoundary title="Campus AI Application Error">
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
         {/* Public Auth Routes (Redirects to dashboard if already logged in) */}
         <Route
           path="/"
@@ -567,6 +569,7 @@ function AppContent() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   </Router>
   );
 }
