@@ -63,7 +63,7 @@ export default function AIChatbot({ role = 'student' }) {
         {
           id: Date.now() + 1,
           role: 'bot',
-          text: '⚠️ Sorry, I couldn't reach the AI service right now. Please try again in a moment.',
+          text: `\u26a0\ufe0f Sorry, I couldn't reach the AI service right now. Please try again in a moment.`,
           isError: true,
         },
       ]);
