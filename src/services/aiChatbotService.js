@@ -2,13 +2,14 @@ import api from './api';
 
 /**
  * Send a message to the CampusAI chatbot powered by Google Gemini.
- * @param {string} message - The user's question
- * @param {string} role    - 'student' | 'teacher' | 'admin'
- * @param {Array}  history - Previous turns: [{role: 'user'|'bot', text: string}]
- * @returns {Promise<string>} - The AI reply text
+ * Uses a longer timeout (45s) because AI calls are slower than regular API calls.
  */
 const askChatbot = async (message, role = 'student', history = []) => {
-  const response = await api.post('/ai-chatbot/ask', { message, role, history });
+  const response = await api.post(
+    '/ai-chatbot/ask',
+    { message, role, history },
+    { timeout: 45000 } // Override default 15s timeout for AI calls
+  );
   return response.data.reply;
 };
 
