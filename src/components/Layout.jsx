@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import AIChatbot from './AIChatbot';
 
 export default function Layout({
   children,
@@ -40,6 +41,9 @@ export default function Layout({
           {children}
         </main>
       </div>
+
+      {/* AI Chatbot — floats on every dashboard page */}
+      <AIChatbot role={role} />
     </div>
   );
 }
