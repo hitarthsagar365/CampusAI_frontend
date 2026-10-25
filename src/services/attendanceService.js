@@ -1,6 +1,18 @@
 import api from './api';
 
 export const attendanceService = {
+  // Requirement 2: Fetch allocated subjects for currently logged-in teacher
+  async getAllocatedSubjects() {
+    try {
+      const response = await api.get('/teacher/allocated-subjects');
+      return response.data.data || [];
+    } catch (err) {
+      // Graceful fallback to /attendance/my-subjects if needed
+      const fallback = await api.get('/attendance/my-subjects');
+      return fallback.data.data || [];
+    }
+  },
+
   // Faculty & Admin: Get assigned subjects
   async getMySubjects() {
     const response = await api.get('/attendance/my-subjects');

@@ -34,20 +34,20 @@ export default function TeacherAttendance({ currentUser }) {
   const [saveSuccess, setSaveSuccess] = useState('');
   const [saveError, setSaveError] = useState('');
 
-  // 1. Fetch assigned subjects for this faculty member
+  // 1. Fetch allocated subjects for this teacher using the allocated-subjects API
   const { data: mySubjects = [], isLoading: isLoadingSubjects } = useQuery({
-    queryKey: ['mySubjects'],
-    queryFn: () => attendanceService.getMySubjects()
+    queryKey: ['allocatedSubjects'],
+    queryFn: () => attendanceService.getAllocatedSubjects()
   });
 
   // Automatically select first assigned subject when loaded
   useEffect(() => {
     if (mySubjects.length > 0 && !selectedAssignmentId) {
-      setSelectedAssignmentId(mySubjects[0]._id);
+      setSelectedAssignmentId(mySubjects[0].assignmentId || mySubjects[0]._id);
     }
   }, [mySubjects, selectedAssignmentId]);
 
-  const selectedAssignment = mySubjects.find((s) => s._id === selectedAssignmentId) || null;
+  const selectedAssignment = mySubjects.find((s) => (s.assignmentId || s._id) === selectedAssignmentId) || null;
 
   // 2. Fetch Roster when assignmentId or date changes
   const {
@@ -161,10 +161,10 @@ export default function TeacherAttendance({ currentUser }) {
         {selectedAssignment && (
           <div className="flex items-center gap-2">
             <span className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm">
-              <BookOpen size={14} /> {selectedAssignment.subject}
+              <BookOpen size={14} /> {typeof selectedAssignment.subject === 'object' && selectedAssignment.subject ? (selectedAssignment.subject.name || selectedAssignment.subject.title) : (selectedAssignment.subjectName || selectedAssignment.subject)}
             </span>
             <span className="px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm">
-              <GraduationCap size={14} /> Sem {selectedAssignment.semester} ({selectedAssignment.department})
+              <GraduationCap size={14} /> Sem {selectedAssignment.semester} ({selectedAssignment.course || selectedAssignment.department || 'General'})
             </span>
           </div>
         )}
@@ -185,7 +185,7 @@ export default function TeacherAttendance({ currentUser }) {
               </div>
             ) : mySubjects.length === 0 ? (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800">
-                No subjects assigned to your faculty profile.
+                No subjects currently allocated to your teacher account.
               </div>
             ) : (
               <select
@@ -193,11 +193,16 @@ export default function TeacherAttendance({ currentUser }) {
                 onChange={(e) => setSelectedAssignmentId(e.target.value)}
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs sm:text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
               >
-                {mySubjects.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.subject} ({s.department} - Sem {s.semester})
-                  </option>
-                ))}
+                {mySubjects.map((s) => {
+                  const sId = s.assignmentId || s._id;
+                  const sName = typeof s.subject === 'object' && s.subject ? (s.subject.name || s.subject.title) : (s.subjectName || s.subject);
+                  const sCourse = s.course || s.department || 'Course';
+                  return (
+                    <option key={sId} value={sId}>
+                      {sName} ({sCourse} — Sem {s.semester}) {s.classSection ? `[Sec ${s.classSection}]` : ''}
+                    </option>
+                  );
+                })}
               </select>
             )}
           </div>
@@ -210,7 +215,7 @@ export default function TeacherAttendance({ currentUser }) {
             </label>
             <div className="px-4 py-2.5 bg-purple-50/50 border border-purple-100 rounded-2xl text-xs font-semibold text-purple-900 flex items-center justify-between">
               <div>
-                <span>Dept: <strong>{selectedAssignment?.department || '—'}</strong></span>
+                <span>Course/Dept: <strong>{selectedAssignment?.course || selectedAssignment?.department || '—'}</strong></span>
                 <span className="mx-2">•</span>
                 <span>Sem: <strong>{selectedAssignment?.semester ? `Semester ${selectedAssignment.semester}` : '—'}</strong></span>
               </div>

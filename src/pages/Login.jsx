@@ -13,10 +13,10 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
   const [role, setRole] = useState('student');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Fetch subjects dynamically via @tanstack/react-query
+  // Requirement 3: Cascading subjects query filtered dynamically by selected faculty department/course
   const { data: subjects = [], isLoading: isSubjectsLoading } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => subjectService.getSubjects(),
+    queryKey: ['subjects', faDepartment],
+    queryFn: () => (faDepartment ? subjectService.getSubjectsByCourse(faDepartment) : subjectService.getSubjects()),
     staleTime: 5 * 60 * 1000
   });
 
@@ -689,14 +689,16 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
                 <select
                   value={faDepartment}
                   onChange={(e) => {
-                    setFaDepartment(e.target.value);
+                    const newDept = e.target.value;
+                    setFaDepartment(newDept);
+                    setFaAssignedSubject(''); // Reset dependent subject selection
                     if (faErrors.department || faErrors.general) setFaErrors({});
                   }}
                   className={`w-full px-3.5 py-2.5 bg-gray-50 border rounded-xl text-xs font-medium text-gray-800 focus:outline-none ${
                     faErrors.department ? 'border-red-500' : 'border-gray-200'
                   }`}
                 >
-                  <option value="">Select Department</option>
+                  <option value="">Select Department / Course</option>
                   {DEPARTMENT_OPTIONS.map((option) => (
                     <option key={option} value={option}>{option}</option>
                   ))}
@@ -751,15 +753,19 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
                       setFaAssignedSubject(e.target.value);
                       if (faErrors.assignedSubject || faErrors.general) setFaErrors({});
                     }}
-                    disabled={isSubjectsLoading}
+                    disabled={isSubjectsLoading || !faDepartment}
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-xs text-gray-900 bg-white focus:outline-none focus:ring-2 ${
                       faErrors.assignedSubject
                         ? 'border-red-500 focus:ring-red-500/20'
                         : 'border-gray-200 focus:ring-indigo-500/20'
-                    } ${isSubjectsLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    } ${isSubjectsLoading || !faDepartment ? 'opacity-70 cursor-not-allowed' : ''}`}
                   >
                     <option value="">
-                      {isSubjectsLoading ? 'Loading subjects...' : '-- Select Assigned Subject --'}
+                      {!faDepartment
+                        ? '-- Select Department first --'
+                        : isSubjectsLoading
+                        ? `Loading ${faDepartment} subjects...`
+                        : `-- Select Assigned Subject (${faDepartment}) --`}
                     </option>
                     {Array.isArray(subjects) && subjects.length > 0 ? (
                       subjects.map((subj) => {
@@ -772,7 +778,7 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
                         );
                       })
                     ) : (
-                      !isSubjectsLoading && <option value="" disabled>No subjects available</option>
+                      !isSubjectsLoading && <option value="" disabled>No subjects available for {faDepartment}</option>
                     )}
                   </select>
                   {isSubjectsLoading && (

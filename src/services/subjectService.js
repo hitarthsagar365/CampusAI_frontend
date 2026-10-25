@@ -1,9 +1,15 @@
 import api from './api';
 
 export const subjectService = {
-  // Fetch all subjects with optional filtering (e.g. by department)
+  // Fetch all subjects with optional filtering (e.g. by department or course)
   async getSubjects(filters = {}) {
     const response = await api.get('/subjects', { params: filters });
+    return response.data.data || response.data || [];
+  },
+
+  // Requirement 3: Filter subjects dynamically by course (e.g. GET /api/subjects?course=CyberSecurity)
+  async getSubjectsByCourse(course) {
+    const response = await api.get('/subjects', { params: { course } });
     return response.data.data || response.data || [];
   },
 
