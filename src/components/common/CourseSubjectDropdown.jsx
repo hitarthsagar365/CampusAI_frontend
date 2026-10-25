@@ -1,23 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, GraduationCap, Loader2, AlertCircle } from 'lucide-react';
 import subjectService from '../../services/subjectService';
+import CourseSemesterSubjectDropdown from './CourseSemesterSubjectDropdown';
+
+export { CourseSemesterSubjectDropdown };
 
 /**
- * Cascading / Dependent Dropdown Component:
- * Select Course -> Fetches and updates Subjects dropdown for that course dynamically.
- * API Endpoint: GET /api/subjects?course=CyberSecurity
+ * Cascading Dropdown Component:
+ * - If 3-level props (isThreeLevel, selectedSemester, or onSemesterChange) are provided,
+ *   it renders the full Course -> Semester -> Subject cascade.
+ * - Otherwise provides the 2-level Course -> Subject cascade.
  */
-export default function CourseSubjectDropdown({
-  selectedCourse = '',
-  selectedSubject = '',
-  onCourseChange,
-  onSubjectChange,
-  courses = ['AIML', 'Cyber Security'],
-  courseLabel = 'Course / Department',
-  subjectLabel = 'Subject',
-  isRequired = true,
-  className = ''
-}) {
+export default function CourseSubjectDropdown(props) {
+  const {
+    selectedCourse = '',
+    selectedSemester,
+    selectedSubject = '',
+    onCourseChange,
+    onSemesterChange,
+    onSubjectChange,
+    courses = ['AIML', 'Cyber Security'],
+    courseLabel = 'Course / Department',
+    semesterLabel = 'Semester',
+    subjectLabel = 'Subject',
+    isRequired = true,
+    isThreeLevel = false,
+    className = ''
+  } = props;
+
+  // If used as 3-level cascading dropdown
+  if (isThreeLevel || selectedSemester !== undefined || onSemesterChange !== undefined) {
+    return <CourseSemesterSubjectDropdown {...props} />;
+  }
+
+  // 2-level Fallback
   const [course, setCourse] = useState(selectedCourse);
   const [subject, setSubject] = useState(selectedSubject);
   const [subjectsList, setSubjectsList] = useState([]);
@@ -46,15 +62,13 @@ export default function CourseSubjectDropdown({
       try {
         setIsLoading(true);
         setFetchError('');
-        // Calls GET /api/subjects?course=CyberSecurity
         const data = await subjectService.getSubjectsByCourse(course);
         if (isMounted) {
           const list = Array.isArray(data) ? data : [];
           setSubjectsList(list);
 
-          // If the currently selected subject does not belong to the new course, reset it
           const stillValid = list.some(
-            (s) => (s._id === subject || s.id === subject || s.name === subject)
+            (s) => s._id === subject || s.id === subject || s.name === subject
           );
           if (!stillValid) {
             setSubject('');
@@ -83,7 +97,7 @@ export default function CourseSubjectDropdown({
   const handleCourseChange = (e) => {
     const newCourse = e.target.value;
     setCourse(newCourse);
-    setSubject(''); // Reset subject selection on course change
+    setSubject('');
 
     if (onCourseChange) {
       onCourseChange(newCourse);

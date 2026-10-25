@@ -14,6 +14,8 @@ import {
   RefreshCw
 } from 'lucide-react';
 import attendanceService from '../../services/attendanceService';
+import subjectService from '../../services/subjectService';
+import CourseSemesterSubjectDropdown from '../../components/common/CourseSemesterSubjectDropdown';
 import { DEPARTMENT_OPTIONS } from '../../constants/departments';
 
 export default function AdminAttendance({ currentUser, facultyList = [], subjectsList = [] }) {
@@ -25,6 +27,7 @@ export default function AdminAttendance({ currentUser, facultyList = [], subject
 
   // Filter states for attendance records
   const [deptFilter, setDeptFilter] = useState('');
+  const [semFilter, setSemFilter] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [searchStudent, setSearchStudent] = useState('');
@@ -38,6 +41,18 @@ export default function AdminAttendance({ currentUser, facultyList = [], subject
   const [newSection, setNewSection] = useState('Section A');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+
+  // Fetch subjects dynamically based on selected course and semester filter
+  const { data: dynamicFilterSubjects = [] } = useQuery({
+    queryKey: ['filterSubjects', deptFilter, semFilter],
+    queryFn: () =>
+      deptFilter && semFilter
+        ? subjectService.getSubjectsByCourseAndSemester(deptFilter, semFilter)
+        : deptFilter
+        ? subjectService.getSubjectsByCourse(deptFilter)
+        : subjectService.getSubjects(),
+    staleTime: 5 * 60 * 1000
+  });
 
   // 1. Fetch All Academic Faculty-Subject Mappings
   const {
@@ -55,10 +70,11 @@ export default function AdminAttendance({ currentUser, facultyList = [], subject
     isLoading: isLoadingRecords,
     refetch: refetchRecords
   } = useQuery({
-    queryKey: ['adminAttendanceRecords', deptFilter, subjectFilter, dateFilter],
+    queryKey: ['adminAttendanceRecords', deptFilter, semFilter, subjectFilter, dateFilter],
     queryFn: () =>
       attendanceService.getAttendance({
         department: deptFilter || undefined,
+        semester: semFilter || undefined,
         subject: subjectFilter || undefined,
         date: dateFilter || undefined
       })
@@ -321,7 +337,7 @@ export default function AdminAttendance({ currentUser, facultyList = [], subject
 
           {/* Filters Bar */}
           <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 text-gray-400" size={14} />
                 <input
@@ -336,7 +352,12 @@ export default function AdminAttendance({ currentUser, facultyList = [], subject
               <div>
                 <select
                   value={deptFilter}
-                  onChange={(e) => setDeptFilter(e.target.value)}
+                  onChange={(e) => {
+                    const newDept = e.target.value;
+                    setDeptFilter(newDept);
+                    setSemFilter(''); // Reset semester
+                    setSubjectFilter(''); // Reset subject
+                  }}
                   className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none"
                 >
                   <option value="">All Departments</option>
@@ -350,12 +371,49 @@ export default function AdminAttendance({ currentUser, facultyList = [], subject
 
               <div>
                 <select
-                  value={subjectFilter}
-                  onChange={(e) => setSubjectFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none"
+                  value={semFilter}
+                  disabled={!deptFilter}
+                  onChange={(e) => {
+                    const newSem = e.target.value;
+                    setSemFilter(newSem);
+                    setSubjectFilter(''); // Reset subject on semester change
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl text-xs focus:outline-none transition-colors ${
+                    !deptFilter
+                      ? 'bg-gray-100/70 border border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-gray-50 border border-gray-200 text-gray-800'
+                  }`}
                 >
-                  <option value="">All Subjects</option>
-                  {subjectsList.map((s) => {
+                  <option value="">
+                    {!deptFilter ? 'All Semesters' : '-- All Semesters --'}
+                  </option>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                    <option key={s} value={String(s)}>
+                      Semester {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <select
+                  value={subjectFilter}
+                  disabled={!deptFilter}
+                  onChange={(e) => setSubjectFilter(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-xl text-xs focus:outline-none truncate transition-colors ${
+                    !deptFilter
+                      ? 'bg-gray-100/70 border border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-gray-50 border border-gray-200 text-gray-800'
+                  }`}
+                >
+                  <option value="">
+                    {!deptFilter
+                      ? 'All Subjects'
+                      : dynamicFilterSubjects.length === 0
+                      ? 'No subjects found'
+                      : 'All Subjects'}
+                  </option>
+                  {dynamicFilterSubjects.map((s) => {
                     const name = s.name || s.title || s;
                     return (
                       <option key={s._id || s.id || name} value={name}>
@@ -596,54 +654,20 @@ export default function AdminAttendance({ currentUser, facultyList = [], subject
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Subject Name *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. MERN, Machine Learning, Cloud Computing"
-                  value={newSubject}
-                  onChange={(e) => setNewSubject(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Department *
-                  </label>
-                  <select
-                    value={newDept}
-                    onChange={(e) => setNewDept(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none"
-                  >
-                    {DEPARTMENT_OPTIONS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">
-                    Semester (1-8) *
-                  </label>
-                  <select
-                    value={newSemester}
-                    onChange={(e) => setNewSemester(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none"
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                      <option key={s} value={s}>
-                        Semester {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <CourseSemesterSubjectDropdown
+                selectedCourse={newDept}
+                selectedSemester={newSemester}
+                selectedSubject={newSubject}
+                onCourseChange={(course) => setNewDept(course)}
+                onSemesterChange={(sem) => setNewSemester(sem)}
+                onSubjectChange={(subj) => setNewSubject(subj)}
+                courses={['AIML', 'Cyber Security']}
+                courseLabel="Course / Department"
+                semesterLabel="Semester (1-8)"
+                subjectLabel="Subject"
+                layout="stacked"
+                size="sm"
+              />
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">

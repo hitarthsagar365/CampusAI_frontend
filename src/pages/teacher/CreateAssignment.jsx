@@ -299,13 +299,18 @@ export default function TeacherCreateAssignment({ currentUser, assignments = [],
 
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                Department *
+                Department / Course *
               </label>
               <select
                 value={department}
-                onChange={(e) => setDepartment(e.target.value)}
+                onChange={(e) => {
+                  setDepartment(e.target.value);
+                  setSemester('');
+                  setSubject('');
+                }}
                 className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:outline-none"
               >
+                <option value="">-- Select Department --</option>
                 {DEPARTMENT_OPTIONS.map((d) => (
                   <option key={d} value={d}>
                     {d}
@@ -320,11 +325,20 @@ export default function TeacherCreateAssignment({ currentUser, assignments = [],
               </label>
               <select
                 value={semester}
-                onChange={(e) => setSemester(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:outline-none"
+                disabled={!department}
+                onChange={(e) => {
+                  setSemester(e.target.value);
+                  setSubject('');
+                }}
+                className={`w-full px-4 py-2.5 rounded-xl text-xs font-medium focus:outline-none transition-colors ${
+                  !department
+                    ? 'bg-gray-100/70 border border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-50 border border-gray-200 text-gray-800'
+                }`}
               >
+                <option value="">-- Select Semester --</option>
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                  <option key={s} value={s}>
+                  <option key={s} value={String(s)}>
                     Semester {s}
                   </option>
                 ))}

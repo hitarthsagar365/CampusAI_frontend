@@ -28,6 +28,13 @@ export const academicService = {
     const response = await api.get('/subjects', { params: filters });
     return response.data.data;
   },
+  async getSubjectsByCourseAndSemester(course, semester) {
+    const params = {};
+    if (course) params.course = course;
+    if (semester) params.semester = semester;
+    const response = await api.get('/subjects', { params });
+    return response.data.data || [];
+  },
   async getSubjectById(id) {
     const response = await api.get(`/subjects/${id}`);
     return response.data.data;

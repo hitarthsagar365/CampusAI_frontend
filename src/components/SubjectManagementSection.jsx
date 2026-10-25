@@ -15,6 +15,7 @@ export default function SubjectManagementSection({
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
+  const [selectedSemester, setSelectedSemester] = useState('All');
   const [selectedType, setSelectedType] = useState('All');
 
   // Modal State (Add / Edit)
@@ -23,7 +24,9 @@ export default function SubjectManagementSection({
   const [modalForm, setModalForm] = useState({
     code: '',
     name: '',
-    dept: 'All Departments',
+    dept: 'AIML',
+    course: 'AIML',
+    semester: '1',
     type: 'Core'
   });
   const [formErrors, setFormErrors] = useState({});
@@ -73,7 +76,9 @@ export default function SubjectManagementSection({
     setModalForm({
       code: '',
       name: '',
-      dept: 'All Departments',
+      dept: selectedDept !== 'All' ? selectedDept : 'AIML',
+      course: selectedDept !== 'All' ? selectedDept : 'AIML',
+      semester: selectedSemester !== 'All' ? selectedSemester : '1',
       type: 'Core'
     });
     setFormErrors({});
@@ -86,7 +91,9 @@ export default function SubjectManagementSection({
     setModalForm({
       code: sub.code || '',
       name: sub.name || '',
-      dept: sub.dept || 'All Departments',
+      dept: sub.dept || sub.course || 'AIML',
+      course: sub.course || sub.dept || 'AIML',
+      semester: sub.semester ? String(sub.semester) : '1',
       type: sub.type || 'Core'
     });
     setFormErrors({});
@@ -168,8 +175,13 @@ export default function SubjectManagementSection({
   const filteredSubjects = useMemo(() => {
     return subjects.filter((s) => {
       if (selectedDept !== 'All') {
-        const d = (s.dept || '').toLowerCase();
+        const d = (s.dept || s.course || '').toLowerCase();
         if (d !== selectedDept.toLowerCase() && d !== 'all departments') return false;
+      }
+      if (selectedSemester !== 'All') {
+        const semClean = String(selectedSemester).replace(/\D/g, '');
+        const subSem = String(s.semester || '').replace(/\D/g, '');
+        if (subSem !== semClean) return false;
       }
       if (selectedType !== 'All') {
         if ((s.type || '').toLowerCase() !== selectedType.toLowerCase()) return false;
@@ -178,12 +190,12 @@ export default function SubjectManagementSection({
         const q = searchTerm.trim().toLowerCase();
         const codeMatch = (s.code || '').toLowerCase().includes(q);
         const nameMatch = (s.name || '').toLowerCase().includes(q);
-        const deptMatch = (s.dept || '').toLowerCase().includes(q);
+        const deptMatch = (s.dept || s.course || '').toLowerCase().includes(q);
         if (!codeMatch && !nameMatch && !deptMatch) return false;
       }
       return true;
     });
-  }, [subjects, selectedDept, selectedType, searchTerm]);
+  }, [subjects, selectedDept, selectedSemester, selectedType, searchTerm]);
 
   // Pagination State for Lazy Data Loading
   const [currentPage, setCurrentPage] = useState(1);
@@ -191,7 +203,7 @@ export default function SubjectManagementSection({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedDept, selectedType, searchTerm, subjects.length]);
+  }, [selectedDept, selectedSemester, selectedType, searchTerm, subjects.length]);
 
   const totalFilteredRecords = filteredSubjects.length;
   const totalPages = Math.ceil(totalFilteredRecords / pageSize) || 1;
@@ -321,6 +333,17 @@ export default function SubjectManagementSection({
           </select>
 
           <select
+            value={selectedSemester}
+            onChange={(e) => setSelectedSemester(e.target.value)}
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-600"
+          >
+            <option value="All">All Semesters</option>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+              <option key={s} value={String(s)}>Semester {s}</option>
+            ))}
+          </select>
+
+          <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-600"
@@ -331,11 +354,12 @@ export default function SubjectManagementSection({
             <option value="Lab">Lab</option>
           </select>
 
-          {(selectedDept !== 'All' || selectedType !== 'All' || searchTerm) && (
+          {(selectedDept !== 'All' || selectedSemester !== 'All' || selectedType !== 'All' || searchTerm) && (
             <button
               type="button"
               onClick={() => {
                 setSelectedDept('All');
+                setSelectedSemester('All');
                 setSelectedType('All');
                 setSearchTerm('');
               }}
@@ -373,7 +397,8 @@ export default function SubjectManagementSection({
                 <tr>
                   <th className="px-4 py-3.5 whitespace-nowrap">Subject Code</th>
                   <th className="px-4 py-3.5 whitespace-nowrap">Subject Name</th>
-                  <th className="px-4 py-3.5 whitespace-nowrap">Department</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Department / Course</th>
+                  <th className="px-4 py-3.5 whitespace-nowrap">Semester</th>
                   <th className="px-4 py-3.5 whitespace-nowrap">Type</th>
                   <th className="px-4 py-3.5 text-right whitespace-nowrap">Actions</th>
                 </tr>
@@ -391,7 +416,12 @@ export default function SubjectManagementSection({
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-100">
-                        {sub.dept || 'All Departments'}
+                        {sub.course || sub.dept || 'All Departments'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        {sub.semester ? `Sem ${sub.semester}` : '—'}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
@@ -571,13 +601,14 @@ export default function SubjectManagementSection({
                 {formErrors.name && <p className="text-[11px] text-red-500 mt-0.5">{formErrors.name}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Department *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Course / Dept *</label>
                   <select
                     value={modalForm.dept}
                     onChange={(e) => {
-                      setModalForm({ ...modalForm, dept: e.target.value });
+                      const val = e.target.value;
+                      setModalForm({ ...modalForm, dept: val, course: val });
                       if (formErrors.dept) setFormErrors({ ...formErrors, dept: '' });
                     }}
                     className={`w-full px-3.5 py-2 bg-slate-50 border rounded-xl text-xs text-slate-900 focus:outline-none focus:border-indigo-600 ${
@@ -589,6 +620,21 @@ export default function SubjectManagementSection({
                     ))}
                   </select>
                   {formErrors.dept && <p className="text-[11px] text-red-500 mt-0.5">{formErrors.dept}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Semester (1-8) *</label>
+                  <select
+                    value={modalForm.semester}
+                    onChange={(e) => {
+                      setModalForm({ ...modalForm, semester: e.target.value });
+                    }}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-indigo-600"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                      <option key={s} value={String(s)}>Semester {s}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

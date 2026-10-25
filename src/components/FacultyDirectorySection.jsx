@@ -28,10 +28,14 @@ export default function FacultyDirectorySection({
   faSuccess,
   handleAddFaculty
 }) {
-  // Fetch available subjects dynamically via react-query
-  const { data: subjects = [], isLoading: isSubjectsLoading } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => subjectService.getSubjects(),
+  // Fetch available subjects dynamically matching Course & Semester for quick-add form
+  const { data: quickSubjects = [], isLoading: isQuickSubjectsLoading } = useQuery({
+    queryKey: ['subjects', faDepartment, faSemester],
+    queryFn: () =>
+      faDepartment && faSemester
+        ? subjectService.getSubjectsByCourseAndSemester(faDepartment, faSemester)
+        : [],
+    enabled: Boolean(faDepartment && faSemester),
     staleTime: 5 * 60 * 1000
   });
 
@@ -59,6 +63,19 @@ export default function FacultyDirectorySection({
   });
   const [modalErrors, setModalErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch available subjects dynamically matching modal Course & Semester
+  const { data: modalSubjects = [], isLoading: isModalSubjectsLoading } = useQuery({
+    queryKey: ['subjects', modalForm.department, modalForm.semester],
+    queryFn: () => {
+      const semNum = String(modalForm.semester || '').replace(/\D/g, '');
+      return modalForm.department && semNum
+        ? subjectService.getSubjectsByCourseAndSemester(modalForm.department, semNum)
+        : [];
+    },
+    enabled: isModalOpen && Boolean(modalForm.department && modalForm.semester),
+    staleTime: 5 * 60 * 1000
+  });
 
   // Delete Confirmation State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -402,18 +419,21 @@ export default function FacultyDirectorySection({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Department *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Department / Course *</label>
                 <select
                   value={faDepartment}
                   onChange={(e) => {
-                    setFaDepartment(e.target.value);
+                    const newDept = e.target.value;
+                    setFaDepartment(newDept);
+                    setFaSemester(''); // Reset semester on course change
+                    setFaAssignedSubject(''); // Reset subject on course change
                     if (faErrors.department) setFaErrors({ ...faErrors, department: '' });
                   }}
                   className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 ${
                     faErrors.department ? 'border-red-500' : 'border-slate-200'
                   }`}
                 >
-                  <option value="">Select Department</option>
+                  <option value="">Select Department / Course</option>
                   {DEPARTMENT_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
@@ -427,15 +447,24 @@ export default function FacultyDirectorySection({
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">Semester Assigned *</label>
                 <select
                   value={faSemester}
+                  disabled={!faDepartment}
                   onChange={(e) => {
-                    setFaSemester(e.target.value);
+                    const newSem = e.target.value;
+                    setFaSemester(newSem);
+                    setFaAssignedSubject(''); // Reset subject on semester change
                     if (faErrors.semester) setFaErrors({ ...faErrors, semester: '' });
                   }}
-                  className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 ${
-                    faErrors.semester ? 'border-red-500' : 'border-slate-200'
+                  className={`w-full px-3.5 py-2.5 rounded-xl border text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-colors ${
+                    !faDepartment
+                      ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                      : faErrors.semester
+                      ? 'bg-slate-50 border-red-500'
+                      : 'bg-slate-50 border-slate-200'
                   }`}
                 >
-                  <option value="">Select Semester</option>
+                  <option value="">
+                    {!faDepartment ? 'Select Department first' : 'Select Semester'}
+                  </option>
                   {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                     <option key={s} value={`Semester ${s}`}>Semester {s}</option>
                   ))}
@@ -469,16 +498,24 @@ export default function FacultyDirectorySection({
                       setFaAssignedSubject(e.target.value);
                       if (faErrors.assignedSubject) setFaErrors({ ...faErrors, assignedSubject: '' });
                     }}
-                    disabled={isSubjectsLoading}
-                    className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 ${
-                      faErrors.assignedSubject ? 'border-red-500' : 'border-slate-200'
-                    } ${isSubjectsLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    disabled={!faDepartment || !faSemester || isQuickSubjectsLoading}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-colors ${
+                      faErrors.assignedSubject
+                        ? 'border-red-500'
+                        : 'border-slate-200'
+                    } ${!faDepartment || !faSemester || isQuickSubjectsLoading ? 'bg-slate-100/70 text-slate-400 cursor-not-allowed' : 'bg-slate-50'}`}
                   >
                     <option value="">
-                      {isSubjectsLoading ? 'Loading subjects...' : '-- Select Assigned Subject --'}
+                      {!faDepartment
+                        ? '-- Select Department first --'
+                        : !faSemester
+                        ? '-- Select Semester first --'
+                        : isQuickSubjectsLoading
+                        ? 'Loading subjects...'
+                        : '-- Select Assigned Subject --'}
                     </option>
-                    {Array.isArray(subjects) && subjects.length > 0 ? (
-                      subjects.map((subj) => {
+                    {Array.isArray(quickSubjects) && quickSubjects.length > 0 ? (
+                      quickSubjects.map((subj) => {
                         const sName = subj.name || subj.subjectName || subj.title || '';
                         const sCode = subj.code || subj.subjectCode || '';
                         return (
@@ -488,10 +525,12 @@ export default function FacultyDirectorySection({
                         );
                       })
                     ) : (
-                      !isSubjectsLoading && <option value="" disabled>No subjects available</option>
+                      !isQuickSubjectsLoading && faDepartment && faSemester && (
+                        <option value="" disabled>No subjects available for {faDepartment} ({faSemester})</option>
+                      )
                     )}
                   </select>
-                  {isSubjectsLoading && (
+                  {isQuickSubjectsLoading && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <Loader2 size={14} className="animate-spin text-slate-400" />
                     </div>
@@ -1101,17 +1140,24 @@ export default function FacultyDirectorySection({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Department *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Department / Course *</label>
                   <select
                     value={modalForm.department}
                     onChange={(e) => {
-                      setModalForm({ ...modalForm, department: e.target.value });
+                      const newDept = e.target.value;
+                      setModalForm({
+                        ...modalForm,
+                        department: newDept,
+                        semester: '', // Reset semester on department change
+                        assignedSubject: '' // Reset subject on department change
+                      });
                       if (modalErrors.department) setModalErrors({ ...modalErrors, department: '' });
                     }}
                     className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600 ${
                       modalErrors.department ? 'border-red-500' : 'border-slate-200'
                     }`}
                   >
+                    <option value="">Select Department / Course</option>
                     {DEPARTMENT_OPTIONS.map((d) => (
                       <option key={d} value={d}>{d}</option>
                     ))}
@@ -1125,9 +1171,24 @@ export default function FacultyDirectorySection({
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Semester Assigned</label>
                   <select
                     value={modalForm.semester}
-                    onChange={(e) => setModalForm({ ...modalForm, semester: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
+                    disabled={!modalForm.department}
+                    onChange={(e) => {
+                      const newSem = e.target.value;
+                      setModalForm({
+                        ...modalForm,
+                        semester: newSem,
+                        assignedSubject: '' // Reset subject on semester change
+                      });
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600 transition-colors ${
+                      !modalForm.department
+                        ? 'bg-slate-100/70 border border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-50 border border-slate-200'
+                    }`}
                   >
+                    <option value="">
+                      {!modalForm.department ? 'Select Department first' : 'Select Semester'}
+                    </option>
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                       <option key={s} value={`Semester ${s}`}>Semester {s}</option>
                     ))}
@@ -1152,16 +1213,26 @@ export default function FacultyDirectorySection({
                   <select
                     value={modalForm.assignedSubject}
                     onChange={(e) => setModalForm({ ...modalForm, assignedSubject: e.target.value })}
-                    disabled={isSubjectsLoading}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600"
+                    disabled={!modalForm.department || !modalForm.semester || isModalSubjectsLoading}
+                    className={`w-full px-3.5 py-2 border rounded-xl text-xs text-slate-900 focus:outline-none focus:border-purple-600 transition-colors ${
+                      !modalForm.department || !modalForm.semester || isModalSubjectsLoading
+                        ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
                   >
                     <option value="">
-                      {isSubjectsLoading ? 'Loading subjects...' : '-- Select Assigned Subject --'}
+                      {!modalForm.department
+                        ? '-- Select Department first --'
+                        : !modalForm.semester
+                        ? '-- Select Semester first --'
+                        : isModalSubjectsLoading
+                        ? 'Loading subjects...'
+                        : '-- Select Assigned Subject --'}
                     </option>
-                    {modalForm.assignedSubject && !subjects.some(s => (s.name || s.subjectName || s.title) === modalForm.assignedSubject) && (
+                    {modalForm.assignedSubject && !modalSubjects.some(s => (s.name || s.subjectName || s.title) === modalForm.assignedSubject) && (
                       <option value={modalForm.assignedSubject}>{modalForm.assignedSubject} (Current)</option>
                     )}
-                    {Array.isArray(subjects) && subjects.map((subj) => {
+                    {Array.isArray(modalSubjects) && modalSubjects.map((subj) => {
                       const sName = subj.name || subj.subjectName || subj.title || '';
                       const sCode = subj.code || subj.subjectCode || '';
                       return (
@@ -1171,7 +1242,7 @@ export default function FacultyDirectorySection({
                       );
                     })}
                   </select>
-                  {isSubjectsLoading && (
+                  {isModalSubjectsLoading && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                       <Loader2 size={14} className="animate-spin text-slate-400" />
                     </div>

@@ -74,6 +74,22 @@ export default function AdminTimetableSection({
     });
   }, [activeTimetables, filterDept, filterSem, filterDiv]);
 
+  // Filter subjects for the Add Timetable modal matching selected ttDepartment and ttSemester
+  const filteredSubjectsForTt = useMemo(() => {
+    return subjects.filter((s) => {
+      if (ttDepartment && ttDepartment !== 'All' && ttDepartment !== 'All Departments') {
+        const d = (s.dept || s.course || '').toLowerCase();
+        if (d !== ttDepartment.toLowerCase() && d !== 'all departments') return false;
+      }
+      if (ttSemester && ttSemester !== 'All') {
+        const sClean = String(ttSemester).replace(/\D/g, '');
+        const subSem = String(s.semester || '').replace(/\D/g, '');
+        if (subSem && sClean && subSem !== sClean) return false;
+      }
+      return true;
+    });
+  }, [subjects, ttDepartment, ttSemester]);
+
   // Handle PDF Generation
   const onGeneratePDF = () => {
     try {
@@ -298,16 +314,21 @@ export default function AdminTimetableSection({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Department *
+                  Department / Course *
                 </label>
                 <select
                   value={ttDepartment}
-                  onChange={(e) => setTtDepartment(e.target.value)}
+                  onChange={(e) => {
+                    const newDept = e.target.value;
+                    setTtDepartment(newDept);
+                    if (setTtSemester) setTtSemester(''); // Reset semester on course change
+                    if (setTtSubject) setTtSubject(''); // Reset subject on course change
+                  }}
                   className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 ${
                     ttErrors.department ? 'border-red-500' : 'border-slate-200'
                   }`}
                 >
-                  <option value="">Select Department</option>
+                  <option value="">Select Department / Course</option>
                   {DEPARTMENT_OPTIONS.map((d) => (
                     <option key={d} value={d}>
                       {d}
@@ -325,9 +346,21 @@ export default function AdminTimetableSection({
                 </label>
                 <select
                   value={ttSemester}
-                  onChange={(e) => setTtSemester(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                  disabled={!ttDepartment}
+                  onChange={(e) => {
+                    const newSem = e.target.value;
+                    setTtSemester(newSem);
+                    if (setTtSubject) setTtSubject(''); // Reset subject on semester change
+                  }}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-colors ${
+                    !ttDepartment
+                      ? 'bg-slate-100/70 border border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-slate-50 border border-slate-200 text-slate-900'
+                  }`}
                 >
+                  <option value="">
+                    {!ttDepartment ? 'Select Department first' : 'Select Semester'}
+                  </option>
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                     <option key={s} value={`Semester ${s}`}>
                       Semester {s}
@@ -477,28 +510,30 @@ export default function AdminTimetableSection({
                     </label>
                     <select
                       value={ttSubject}
+                      disabled={!ttDepartment || !ttSemester}
                       onChange={(e) => setTtSubject(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 bg-slate-50 border rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 ${
-                        ttErrors.subject ? 'border-red-500' : 'border-slate-200'
+                      className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-colors ${
+                        !ttDepartment || !ttSemester
+                          ? 'bg-slate-100/70 border border-slate-200 text-slate-400 cursor-not-allowed'
+                          : ttErrors.subject
+                          ? 'bg-slate-50 border border-red-500 text-slate-900'
+                          : 'bg-slate-50 border border-slate-200 text-slate-900'
                       }`}
                     >
-                      <option value="">Select Subject</option>
-                      {subjects.map((sub) => (
+                      <option value="">
+                        {!ttDepartment
+                          ? '-- Select Department first --'
+                          : !ttSemester
+                          ? '-- Select Semester first --'
+                          : filteredSubjectsForTt.length === 0
+                          ? `-- No subjects for ${ttDepartment} (${ttSemester}) --`
+                          : '-- Select Subject --'}
+                      </option>
+                      {filteredSubjectsForTt.map((sub) => (
                         <option key={sub._id || sub.id || sub.name} value={sub.name}>
-                          {sub.name} {sub.code ? `(${sub.code})` : ''}
+                          {sub.name} {sub.code ? `(${sub.code})` : ''} {sub.dept ? `• ${sub.dept}` : ''}
                         </option>
                       ))}
-                      {/* Standard fallbacks */}
-                      {subjects.length === 0 && (
-                        <>
-                          <option value="Machine Learning">Machine Learning</option>
-                          <option value="Deep Learning">Deep Learning</option>
-                          <option value="Network Security">Network Security</option>
-                          <option value="Cryptography">Cryptography</option>
-                          <option value="Cloud Computing">Cloud Computing</option>
-                          <option value="MERN Stack Development">MERN Stack Development</option>
-                        </>
-                      )}
                     </select>
                     {ttErrors.subject && (
                       <p className="text-[11px] text-red-500 font-medium mt-1">{ttErrors.subject}</p>

@@ -41,10 +41,14 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
   const [faPassword, setFaPassword] = useState('');
   const [faErrors, setFaErrors] = useState({});
 
-  // Requirement 3: Cascading subjects query filtered dynamically by selected faculty department/course
+  // Global 3-level cascade: subjects query filtered dynamically by selected faculty department AND semester
   const { data: subjects = [], isLoading: isSubjectsLoading } = useQuery({
-    queryKey: ['subjects', faDepartment],
-    queryFn: () => (faDepartment ? subjectService.getSubjectsByCourse(faDepartment) : subjectService.getSubjects()),
+    queryKey: ['subjects', faDepartment, faSemester],
+    queryFn: () =>
+      faDepartment && faSemester
+        ? subjectService.getSubjectsByCourseAndSemester(faDepartment, faSemester)
+        : [],
+    enabled: Boolean(faDepartment && faSemester),
     staleTime: 5 * 60 * 1000
   });
 
@@ -685,12 +689,13 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Department *</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Department / Course *</label>
                 <select
                   value={faDepartment}
                   onChange={(e) => {
                     const newDept = e.target.value;
                     setFaDepartment(newDept);
+                    setFaSemester(''); // Reset dependent semester selection
                     setFaAssignedSubject(''); // Reset dependent subject selection
                     if (faErrors.department || faErrors.general) setFaErrors({});
                   }}
@@ -711,14 +716,24 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Semester *</label>
                   <select
                     value={faSemester}
+                    disabled={!faDepartment}
                     onChange={(e) => {
-                      setFaSemester(e.target.value);
+                      const newSem = e.target.value;
+                      setFaSemester(newSem);
+                      setFaAssignedSubject(''); // Reset dependent subject selection on semester change
                       if (faErrors.semester || faErrors.general) setFaErrors({});
                     }}
-                    className={`w-full px-3.5 py-2.5 bg-gray-50 border rounded-xl text-xs font-medium text-gray-800 focus:outline-none ${
-                      faErrors.semester ? 'border-red-500' : 'border-gray-200'
+                    className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-medium transition-all focus:outline-none ${
+                      !faDepartment
+                        ? 'bg-gray-100/70 border-gray-200 text-gray-400 cursor-not-allowed'
+                        : faErrors.semester
+                        ? 'bg-gray-50 border-red-500 text-gray-800'
+                        : 'bg-gray-50 border-gray-200 text-gray-800'
                     }`}
                   >
+                    <option value="">
+                      {!faDepartment ? '-- Select Course first --' : '-- Select Semester --'}
+                    </option>
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
                       <option key={sem} value={String(sem)}>Semester {sem}</option>
                     ))}
@@ -753,19 +768,21 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
                       setFaAssignedSubject(e.target.value);
                       if (faErrors.assignedSubject || faErrors.general) setFaErrors({});
                     }}
-                    disabled={isSubjectsLoading || !faDepartment}
+                    disabled={isSubjectsLoading || !faDepartment || !faSemester}
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-xs text-gray-900 bg-white focus:outline-none focus:ring-2 ${
                       faErrors.assignedSubject
                         ? 'border-red-500 focus:ring-red-500/20'
                         : 'border-gray-200 focus:ring-indigo-500/20'
-                    } ${isSubjectsLoading || !faDepartment ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    } ${isSubjectsLoading || !faDepartment || !faSemester ? 'opacity-70 cursor-not-allowed bg-gray-100/70' : ''}`}
                   >
                     <option value="">
                       {!faDepartment
-                        ? '-- Select Department first --'
+                        ? '-- Select Department / Course first --'
+                        : !faSemester
+                        ? '-- Select Semester first --'
                         : isSubjectsLoading
-                        ? `Loading ${faDepartment} subjects...`
-                        : `-- Select Assigned Subject (${faDepartment}) --`}
+                        ? `Loading ${faDepartment} (Sem ${faSemester}) subjects...`
+                        : `-- Select Assigned Subject (${faDepartment} - Sem ${faSemester}) --`}
                     </option>
                     {Array.isArray(subjects) && subjects.length > 0 ? (
                       subjects.map((subj) => {
@@ -778,7 +795,9 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
                         );
                       })
                     ) : (
-                      !isSubjectsLoading && <option value="" disabled>No subjects available for {faDepartment}</option>
+                      !isSubjectsLoading && faDepartment && faSemester && (
+                        <option value="" disabled>No subjects available for {faDepartment} (Sem {faSemester})</option>
+                      )
                     )}
                   </select>
                   {isSubjectsLoading && (

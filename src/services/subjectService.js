@@ -7,9 +7,19 @@ export const subjectService = {
     return response.data.data || response.data || [];
   },
 
-  // Requirement 3: Filter subjects dynamically by course (e.g. GET /api/subjects?course=CyberSecurity)
+  // Requirement: Filter subjects dynamically by course (e.g. GET /api/subjects?course=CyberSecurity)
   async getSubjectsByCourse(course) {
     const response = await api.get('/subjects', { params: { course } });
+    return response.data.data || response.data || [];
+  },
+
+  // Global 3-level dependent cascade: Filter subjects strictly by course AND semester
+  // (e.g. GET /api/subjects?course=AIML&semester=3)
+  async getSubjectsByCourseAndSemester(course, semester) {
+    const params = {};
+    if (course) params.course = course;
+    if (semester) params.semester = semester;
+    const response = await api.get('/subjects', { params });
     return response.data.data || response.data || [];
   },
 

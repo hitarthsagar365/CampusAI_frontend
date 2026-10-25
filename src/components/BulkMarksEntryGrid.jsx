@@ -79,9 +79,9 @@ export default function BulkMarksEntryGrid({
   });
 
   const { data: adminSubjects = [] } = useQuery({
-    queryKey: ['adminSubjects'],
-    queryFn: () => academicService.getSubjects(),
-    enabled: isAdmin
+    queryKey: ['adminSubjects', selectedDepartment, selectedSemester],
+    queryFn: () => academicService.getSubjectsByCourseAndSemester(selectedDepartment, selectedSemester),
+    enabled: isAdmin && !!selectedDepartment && !!selectedSemester
   });
 
   // ============================================================================
@@ -189,9 +189,9 @@ export default function BulkMarksEntryGrid({
     if (!isAdmin) {
       const subs = mySubjects
         .filter((s) => {
-          const deptMatch = !s.department || s.department.toLowerCase() === selectedDepartment.toLowerCase();
+          const deptMatch = !s.department || s.department.toLowerCase() === (selectedDepartment || '').toLowerCase();
           const sSem = String(s.semester || '').replace(/[^0-9]/g, '');
-          const semMatch = !sSem || sSem === String(selectedSemester);
+          const semMatch = !sSem || sSem === String(selectedSemester || '');
           return deptMatch && semMatch;
         })
         .map((s) => s.subject);
@@ -199,12 +199,11 @@ export default function BulkMarksEntryGrid({
       if (subs.length === 0 && currentUser?.assignedSubject) {
         return [currentUser.assignedSubject];
       }
-      return subs.length > 0 ? Array.from(new Set(subs)) : ['Machine Learning'];
+      return subs.length > 0 ? Array.from(new Set(subs)) : [];
     }
 
     const systemSubs = adminSubjects.map((s) => s.name || s.subject || s.title).filter(Boolean);
-    const defaults = ['Network Security', 'Machine Learning', 'Deep Learning', 'Neural Networks', 'Cyber Forensics', 'Cloud Computing', 'Database Management'];
-    return Array.from(new Set([...systemSubs, ...defaults]));
+    return Array.from(new Set(systemSubs));
   }, [isAdmin, mySubjects, adminSubjects, currentUser, selectedDepartment, selectedSemester]);
 
   useEffect(() => {
@@ -706,9 +705,15 @@ export default function BulkMarksEntryGrid({
             {isAdmin ? (
               <select
                 value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
+                onChange={(e) => {
+                  const newDept = e.target.value;
+                  setSelectedDepartment(newDept);
+                  setSelectedSemester(''); // Reset semester on department change
+                  setSelectedSubject(''); // Reset subject on department change
+                }}
                 className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
               >
+                <option value="">-- Select Dept --</option>
                 {availableDepartments.map((dept) => (
                   <option key={dept} value={dept}>
                     {dept}
@@ -717,7 +722,7 @@ export default function BulkMarksEntryGrid({
               </select>
             ) : (
               <div className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-xs font-medium text-gray-700 flex items-center justify-between cursor-not-allowed">
-                <span>{selectedDepartment}</span>
+                <span>{selectedDepartment || 'AIML'}</span>
                 <Lock size={12} className="text-gray-400" />
               </div>
             )}
@@ -730,9 +735,21 @@ export default function BulkMarksEntryGrid({
             </label>
             <select
               value={selectedSemester}
-              onChange={(e) => setSelectedSemester(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={!selectedDepartment}
+              onChange={(e) => {
+                const newSem = e.target.value;
+                setSelectedSemester(newSem);
+                setSelectedSubject(''); // Reset subject on semester change
+              }}
+              className={`w-full px-2.5 py-1.5 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                !selectedDepartment
+                  ? 'bg-gray-100/70 border-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-white border border-gray-300 text-gray-900'
+              }`}
             >
+              <option value="">
+                {!selectedDepartment ? '-- Select Dept first --' : '-- Select Semester --'}
+              </option>
               {availableSemesters.map((sem) => {
                 const semNum = String(sem).replace(/[^0-9]/g, '') || sem;
                 return (
@@ -769,9 +786,23 @@ export default function BulkMarksEntryGrid({
             </label>
             <select
               value={selectedSubject}
+              disabled={!selectedDepartment || !selectedSemester}
               onChange={(e) => setSelectedSubject(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 truncate"
+              className={`w-full px-2.5 py-1.5 rounded-md text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 truncate transition-colors ${
+                !selectedDepartment || !selectedSemester
+                  ? 'bg-gray-100/70 border-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-white border border-gray-300 text-gray-900'
+              }`}
             >
+              <option value="">
+                {!selectedDepartment
+                  ? '-- Select Dept first --'
+                  : !selectedSemester
+                  ? '-- Select Semester first --'
+                  : availableSubjects.length === 0
+                  ? '-- No subjects found --'
+                  : '-- Select Subject --'}
+              </option>
               {availableSubjects.map((sub) => (
                 <option key={sub} value={sub}>
                   {sub}
