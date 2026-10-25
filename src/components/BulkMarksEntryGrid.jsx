@@ -172,8 +172,18 @@ export default function BulkMarksEntryGrid({
 
   // Derive available criteria options
   const availableDepartments = useMemo(() => {
-    return !isAdmin ? [facultyDept || 'AIML'] : ['Cyber Security', 'AIML'];
-  }, [isAdmin, facultyDept]);
+    if (!isAdmin) {
+      const depts = new Set();
+      if (facultyDept) depts.add(facultyDept);
+      if (currentUser?.department && currentUser.department !== 'All Departments') depts.add(currentUser.department);
+      mySubjects.forEach((s) => {
+        if (s?.department && s.department !== 'All Departments') depts.add(s.department);
+        if (s?.course && s.course !== 'All Departments') depts.add(s.course);
+      });
+      return depts.size > 0 ? Array.from(depts) : [facultyDept || 'AIML'];
+    }
+    return ['Cyber Security', 'AIML'];
+  }, [isAdmin, facultyDept, currentUser, mySubjects]);
 
   const availableSemesters = useMemo(() => {
     if (!isAdmin) {
@@ -183,7 +193,8 @@ export default function BulkMarksEntryGrid({
         if (s) sems.add(s);
       }
       mySubjects.forEach((sub) => {
-        if (sub?.semester) {
+        const deptMatch = !selectedDepartment || !sub?.department || String(sub.department).toLowerCase() === String(selectedDepartment).toLowerCase();
+        if (deptMatch && sub?.semester) {
           const s = String(sub.semester).replace(/[^0-9]/g, '');
           if (s) sems.add(s);
         }
@@ -191,7 +202,7 @@ export default function BulkMarksEntryGrid({
       return sems.size > 0 ? Array.from(sems).sort() : ['6'];
     }
     return ['1', '2', '3', '4', '5', '6', '7', '8'];
-  }, [isAdmin, currentUser, mySubjects]);
+  }, [isAdmin, currentUser, mySubjects, selectedDepartment]);
 
   const availableDivisions = useMemo(() => {
     if (!isAdmin) {
@@ -747,7 +758,7 @@ export default function BulkMarksEntryGrid({
             <label className="block text-[11px] font-semibold text-gray-600 mb-1">
               Department *
             </label>
-            {isAdmin ? (
+            {isAdmin || availableDepartments.length > 1 ? (
               <select
                 value={selectedDepartment}
                 onChange={(e) => {
@@ -758,7 +769,7 @@ export default function BulkMarksEntryGrid({
                 }}
                 className="w-full px-2.5 py-1.5 bg-white border border-gray-300 rounded-md text-xs font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
               >
-                <option value="">-- Select Dept --</option>
+                {isAdmin && <option value="">-- Select Dept --</option>}
                 {availableDepartments.map((dept) => (
                   <option key={dept} value={dept}>
                     {dept}

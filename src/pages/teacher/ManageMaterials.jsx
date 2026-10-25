@@ -28,7 +28,9 @@ export default function TeacherMaterials({ currentUser, materials = [], setMater
 
   useEffect(() => {
     if (mySubjects.length > 0 && !subject) {
-      setSubject(mySubjects[0].subject);
+      const first = mySubjects[0];
+      const sName = typeof first.subject === 'object' ? first.subject?.name : (first.subjectName || first.subject);
+      if (sName) setSubject(sName);
     } else if (!subject && currentUser?.assignedSubject) {
       setSubject(currentUser.assignedSubject);
     }
@@ -171,11 +173,14 @@ export default function TeacherMaterials({ currentUser, materials = [], setMater
                   className={`w-full px-3.5 py-2 bg-gray-50 border rounded-xl text-xs text-gray-900 focus:outline-none ${errors.subject ? 'border-red-500' : 'border-gray-200'}`}
                 >
                   <option value="">Select Assigned Subject</option>
-                  {mySubjects.map((s) => (
-                    <option key={s._id} value={s.subject}>
-                      {s.subject} ({s.department} Sem {s.semester})
-                    </option>
-                  ))}
+                  {mySubjects.map((s) => {
+                    const subjName = typeof s.subject === 'object' ? s.subject?.name : (s.subjectName || s.subject || 'Subject');
+                    return (
+                      <option key={s._id} value={subjName}>
+                        {subjName} ({s.department} Sem {s.semester})
+                      </option>
+                    );
+                  })}
                 </select>
               ) : (
                 <input

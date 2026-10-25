@@ -17,8 +17,13 @@ export const subjectService = {
   // (e.g. GET /api/subjects?course=AIML&semester=3)
   async getSubjectsByCourseAndSemester(course, semester) {
     const params = {};
-    if (course) params.course = course;
-    if (semester) params.semester = semester;
+    if (course && course !== 'All' && course !== 'All Departments') {
+      params.course = course;
+      params.department = course;
+    }
+    if (semester !== undefined && semester !== null && semester !== '' && semester !== 'All') {
+      params.semester = String(semester).replace(/\D/g, '') || semester;
+    }
     const response = await api.get('/subjects', { params });
     return response.data.data || response.data || [];
   },

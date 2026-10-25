@@ -56,7 +56,10 @@ export default function TeacherCreateAssignment({ currentUser, assignments = [],
   // Auto-fill when assigned subject is selected
   const handleSubjectChange = (subjName) => {
     setSubject(subjName);
-    const found = mySubjects.find((s) => s.subject === subjName);
+    const found = mySubjects.find((s) => {
+      const name = typeof s.subject === 'object' ? s.subject?.name : (s.subjectName || s.subject);
+      return name === subjName;
+    });
     if (found) {
       if (found.department) setDepartment(found.department);
       if (found.semester) setSemester(String(found.semester));
@@ -67,7 +70,9 @@ export default function TeacherCreateAssignment({ currentUser, assignments = [],
 
   React.useEffect(() => {
     if (mySubjects.length > 0 && !subject) {
-      handleSubjectChange(mySubjects[0].subject);
+      const first = mySubjects[0];
+      const firstName = typeof first.subject === 'object' ? first.subject?.name : (first.subjectName || first.subject);
+      if (firstName) handleSubjectChange(firstName);
     } else if (!subject && currentUser?.assignedSubject) {
       setSubject(currentUser.assignedSubject);
       if (currentUser.department) setDepartment(currentUser.department);
@@ -274,11 +279,14 @@ export default function TeacherCreateAssignment({ currentUser, assignments = [],
                   }`}
                 >
                   <option value="">-- Choose Subject --</option>
-                  {mySubjects.map((s) => (
-                    <option key={s._id} value={s.subject}>
-                      {s.subject} ({s.department} Sem {s.semester})
-                    </option>
-                  ))}
+                  {mySubjects.map((s) => {
+                    const subjName = typeof s.subject === 'object' ? s.subject?.name : (s.subjectName || s.subject || 'Subject');
+                    return (
+                      <option key={s._id} value={subjName}>
+                        {subjName} ({s.department} Sem {s.semester})
+                      </option>
+                    );
+                  })}
                 </select>
               ) : (
                 <input

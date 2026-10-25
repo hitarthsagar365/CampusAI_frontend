@@ -45,12 +45,14 @@ export default function AdminAttendance({ currentUser, facultyList = [], subject
   // Fetch subjects dynamically based on selected course and semester filter
   const { data: dynamicFilterSubjects = [] } = useQuery({
     queryKey: ['filterSubjects', deptFilter, semFilter],
-    queryFn: () =>
-      deptFilter && semFilter
-        ? subjectService.getSubjectsByCourseAndSemester(deptFilter, semFilter)
+    queryFn: () => {
+      const cleanSem = semFilter ? String(semFilter).replace(/\D/g, '') : '';
+      return deptFilter && cleanSem
+        ? subjectService.getSubjectsByCourseAndSemester(deptFilter, cleanSem)
         : deptFilter
         ? subjectService.getSubjectsByCourse(deptFilter)
-        : subjectService.getSubjects(),
+        : subjectService.getSubjects();
+    },
     staleTime: 5 * 60 * 1000
   });
 

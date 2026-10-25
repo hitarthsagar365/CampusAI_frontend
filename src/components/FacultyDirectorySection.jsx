@@ -31,10 +31,12 @@ export default function FacultyDirectorySection({
   // Fetch available subjects dynamically matching Course & Semester for quick-add form
   const { data: quickSubjects = [], isLoading: isQuickSubjectsLoading } = useQuery({
     queryKey: ['subjects', faDepartment, faSemester],
-    queryFn: () =>
-      faDepartment && faSemester
-        ? subjectService.getSubjectsByCourseAndSemester(faDepartment, faSemester)
-        : [],
+    queryFn: () => {
+      const semNum = String(faSemester || '').replace(/\D/g, '');
+      return faDepartment && semNum
+        ? subjectService.getSubjectsByCourseAndSemester(faDepartment, semNum)
+        : [];
+    },
     enabled: Boolean(faDepartment && faSemester),
     staleTime: 5 * 60 * 1000
   });

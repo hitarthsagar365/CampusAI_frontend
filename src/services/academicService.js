@@ -26,14 +26,19 @@ export const academicService = {
   // SUBJECTS
   async getSubjects(filters = {}) {
     const response = await api.get('/subjects', { params: filters });
-    return response.data.data;
+    return response.data.data || response.data || [];
   },
   async getSubjectsByCourseAndSemester(course, semester) {
     const params = {};
-    if (course) params.course = course;
-    if (semester) params.semester = semester;
+    if (course && course !== 'All' && course !== 'All Departments') {
+      params.course = course;
+      params.department = course;
+    }
+    if (semester !== undefined && semester !== null && semester !== '' && semester !== 'All') {
+      params.semester = String(semester).replace(/\D/g, '') || semester;
+    }
     const response = await api.get('/subjects', { params });
-    return response.data.data || [];
+    return response.data.data || response.data || [];
   },
   async getSubjectById(id) {
     const response = await api.get(`/subjects/${id}`);
