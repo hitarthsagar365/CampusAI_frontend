@@ -99,19 +99,30 @@ export const authService = {
     localStorage.removeItem('currentUser');
   },
 
-  // Forgot Password: sends password reset email with token
+  // Forgot Password: sends password reset email with token via Brevo HTTP API
   async forgotPassword(email) {
-    const response = await api.post('/auth/forgot-password', { email });
-    return response.data;
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
-  // Reset Password: submit new password with token from URL param
-  async resetPassword(token, password, confirmPassword) {
-    const response = await api.post(`/auth/reset-password/${token}`, {
-      password,
-      confirmPassword
-    });
-    return response.data;
+  // Reset Password: submit new password with token and email
+  async resetPassword(token, emailOrPassword, newPassword) {
+    try {
+      let payload;
+      if (newPassword !== undefined) {
+        payload = { token, email: emailOrPassword, newPassword };
+      } else {
+        payload = { token, newPassword: emailOrPassword };
+      }
+      const response = await api.post('/auth/reset-password', payload);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
 
   // Check if access token is present

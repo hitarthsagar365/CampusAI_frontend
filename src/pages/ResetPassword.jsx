@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
 import { Lock, Eye, EyeOff, ArrowRight, ArrowLeft, Loader2, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import authService from '../services/authService';
 
 export default function ResetPassword() {
-  const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const { token: routeParamToken } = useParams();
   const navigate = useNavigate();
+
+  // Read token and email from URL query params (fallback to route params if any)
+  const token = searchParams.get('token') || routeParamToken || '';
+  const email = searchParams.get('email') || '';
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,7 +33,14 @@ export default function ResetPassword() {
     return () => clearTimeout(timer);
   }, [success, countdown, navigate]);
 
-  // Basic password strength score (0-4)
+  // Check if token is present on mount
+  useEffect(() => {
+    if (!token) {
+      setError('Password reset token is missing from the URL. Please verify your email reset link.');
+    }
+  }, [token]);
+
+  // Password strength score (0-4)
   const getPasswordStrength = (pass) => {
     if (!pass) return 0;
     let score = 0;
@@ -48,7 +60,7 @@ export default function ResetPassword() {
     setError('');
 
     if (!token) {
-      setError('Password reset token is missing from URL. Please check your email link.');
+      setError('Password reset token is missing. Please request a new reset link.');
       return;
     }
 
@@ -69,13 +81,13 @@ export default function ResetPassword() {
 
     try {
       setLoading(true);
-      await authService.resetPassword(token, password, confirmPassword);
+      await authService.resetPassword(token, email, password);
       setSuccess(true);
     } catch (err) {
       const message =
         err.response?.data?.message ||
         err.message ||
-        'Password reset failed. The token may be expired or invalid.';
+        'Password reset failed. The link may have expired or is invalid.';
       setError(message);
     } finally {
       setLoading(false);
@@ -99,16 +111,16 @@ export default function ResetPassword() {
               </div>
 
               <h2 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">
-                Password Reset Complete!
+                Password Reset Successful!
               </h2>
 
               <p className="text-sm text-slate-600 leading-relaxed mb-6">
-                Your password has been successfully updated. You can now log in using your new credentials.
+                Your password has been successfully updated. All previous sessions have been logged out for security.
               </p>
 
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-xs text-slate-500 mb-6 flex items-center justify-center gap-2">
                 <Loader2 size={16} className="animate-spin text-indigo-600" />
-                <span>Redirecting to sign in page in <strong>{countdown}s</strong>...</span>
+                <span>Redirecting to login in <strong>{countdown}s</strong>...</span>
               </div>
 
               <button
@@ -116,7 +128,7 @@ export default function ResetPassword() {
                 onClick={() => navigate('/login')}
                 className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25"
               >
-                <span>Sign In Now</span>
+                <span>Go to Login</span>
                 <ArrowRight size={18} />
               </button>
             </div>
@@ -132,7 +144,11 @@ export default function ResetPassword() {
                   Set New Password
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-2">
-                  Please choose a strong password to protect your Campus AI account.
+                  {email ? (
+                    <>Resetting password for <span className="font-medium text-slate-700">{email}</span></>
+                  ) : (
+                    'Enter a strong new password for your CampusAI account.'
+                  )}
                 </p>
               </div>
 
@@ -142,14 +158,12 @@ export default function ResetPassword() {
                   <AlertCircle size={18} className="shrink-0 text-rose-500 mt-0.5" />
                   <div className="space-y-1">
                     <p className="leading-relaxed">{error}</p>
-                    {error.toLowerCase().includes('expired') && (
-                      <Link
-                        to="/forgot-password"
-                        className="inline-block text-xs font-semibold text-rose-800 underline hover:text-rose-900 mt-1"
-                      >
-                        Request a fresh password reset link
-                      </Link>
-                    )}
+                    <Link
+                      to="/login"
+                      className="inline-block text-xs font-semibold text-rose-800 underline hover:text-rose-900 mt-1"
+                    >
+                      Return to Login to request a new link
+                    </Link>
                   </div>
                 </div>
               )}
@@ -175,7 +189,7 @@ export default function ResetPassword() {
                       }}
                       placeholder="At least 6 characters"
                       className="w-full pl-10 pr-11 py-3 rounded-xl border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 transition-all bg-white"
-                      disabled={loading}
+                      disabled={loading || !token}
                     />
                     <button
                       type="button"
@@ -231,7 +245,7 @@ export default function ResetPassword() {
                           ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500'
                           : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-600'
                       }`}
-                      disabled={loading}
+                      disabled={loading || !token}
                     />
                     <button
                       type="button"
@@ -252,13 +266,13 @@ export default function ResetPassword() {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !token}
                   className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-semibold text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 active:scale-[0.99] mt-2"
                 >
                   {loading ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      <span>Updating password...</span>
+                      <span>Resetting Password...</span>
                     </>
                   ) : (
                     <>
@@ -276,7 +290,7 @@ export default function ResetPassword() {
                   className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors"
                 >
                   <ArrowLeft size={16} />
-                  <span>Back to Sign In</span>
+                  <span>Back to Login</span>
                 </Link>
               </div>
             </>

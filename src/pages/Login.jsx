@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { GraduationCap, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff, ArrowRight, Loader2, AlertCircle, CheckCircle2, Mail, X } from 'lucide-react';
 import { DEPARTMENT_OPTIONS } from '../constants/departments';
 import authService from '../services/authService';
 import subjectService from '../services/subjectService';
@@ -19,6 +19,44 @@ export default function Login({ currentUser, setCurrentUser, students = [], setS
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loginErrors, setLoginErrors] = useState({});
+
+  // Forgot Password modal state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [forgotError, setForgotError] = useState('');
+
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotMessage('');
+
+    if (!forgotEmail || !forgotEmail.trim()) {
+      setForgotError('Please enter your email address.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(forgotEmail.trim())) {
+      setForgotError('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      setForgotLoading(true);
+      const data = await authService.forgotPassword(forgotEmail.trim());
+      setForgotMessage(data?.message || 'If an account with that email exists, a reset link has been sent.');
+    } catch (err) {
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to request password reset. Please try again.';
+      setForgotError(message);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   // Student Reg State
   const [stName, setStName] = useState('');
