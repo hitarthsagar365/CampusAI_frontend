@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import Layout from '../../components/Layout';
-import { Mail, Award, UserCheck } from 'lucide-react';
+import { Mail, Award, UserCheck, Camera, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import authService from '../../services/authService';
 
-export default function StudentProfile({ currentUser }) {
+export default function StudentProfile({ currentUser, setCurrentUser }) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadFeedback, setUploadFeedback] = useState(null); // { type: 'success' | 'error', message: '' }
+  const fileInputRef = useRef(null);
+
   if (!currentUser) {
     return (
       <Layout role="student" currentUser={currentUser}>
@@ -18,12 +23,132 @@ export default function StudentProfile({ currentUser }) {
   const email = currentUser.email || '';
   const initials = name ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'U';
 
+  const handleAvatarSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate type (.png, .jpg, .jpeg)
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+    const validExtensions = ['.png', '.jpg', '.jpeg'];
+    const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+
+    if (!validTypes.includes(file.type) && !validExtensions.includes(fileExt)) {
+      setUploadFeedback({
+        type: 'error',
+        message: 'Invalid format! Please upload a .png, .jpg, or .jpeg image.'
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadFeedback({
+        type: 'error',
+        message: 'File size exceeds 5MB limit. Please choose a smaller image.'
+      });
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadFeedback(null);
+      const res = await authService.updateProfilePicture(file);
+      const newAvatarUrl = res.avatarUrl || res.user?.avatar;
+
+      const updatedUser = res.user || {
+        ...currentUser,
+        avatar: newAvatarUrl
+      };
+
+      if (setCurrentUser) {
+        setCurrentUser(updatedUser);
+      }
+
+      setUploadFeedback({
+        type: 'success',
+        message: 'Profile picture updated successfully!'
+      });
+
+      setTimeout(() => setUploadFeedback(null), 4000);
+    } catch (err) {
+      console.error('Failed to upload profile picture:', err);
+      const msg = err.response?.data?.message || err.message || 'Failed to upload profile picture to Cloudinary.';
+      setUploadFeedback({
+        type: 'error',
+        message: msg
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const renderAvatarCircle = () => (
+    <div className="relative group shrink-0">
+      <div className="w-28 h-28 rounded-full border-4 border-white bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white text-3xl font-extrabold shadow-md overflow-hidden relative">
+        {currentUser?.avatar ? (
+          <img
+            src={currentUser.avatar}
+            alt={name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span>{initials}</span>
+        )}
+
+        {isUploading && (
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex flex-col items-center justify-center text-white">
+            <Loader2 className="animate-spin" size={24} />
+            <span className="text-[10px] font-semibold mt-1">Uploading...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Camera button overlay to trigger file upload */}
+      <button
+        type="button"
+        disabled={isUploading}
+        onClick={() => fileInputRef.current?.click()}
+        title="Upload new profile picture"
+        className="absolute bottom-1 right-1 p-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-full shadow-lg border-2 border-white transition-all cursor-pointer disabled:opacity-50"
+      >
+        <Camera size={15} />
+      </button>
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleAvatarSelect}
+        accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+        className="hidden"
+      />
+    </div>
+  );
+
   if (role === 'faculty' || role === 'teacher') {
     const username = currentUser.username || '';
     const department = currentUser.department || '';
 
     return (
       <Layout role="teacher" currentUser={currentUser}>
+        {uploadFeedback && (
+          <div
+            className={`mb-4 p-3.5 rounded-xl border text-xs font-semibold flex items-center gap-2.5 transition-all ${
+              uploadFeedback.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}
+          >
+            {uploadFeedback.type === 'success' ? (
+              <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+            ) : (
+              <AlertCircle size={16} className="shrink-0 text-rose-600" />
+            )}
+            <span>{uploadFeedback.message}</span>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl border border-gray-200/80 overflow-hidden shadow-sm mb-8">
           <div className="h-44 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 relative">
             <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
@@ -31,9 +156,7 @@ export default function StudentProfile({ currentUser }) {
 
           <div className="px-8 pb-6 relative flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 -mt-16">
             <div className="flex items-end gap-5">
-              <div className="w-28 h-28 rounded-full border-4 border-white bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white text-3xl font-extrabold shadow-md">
-                {initials}
-              </div>
+              {renderAvatarCircle()}
               <div className="mb-1">
                 <h1 className="text-2xl font-extrabold text-gray-900">{name}</h1>
                 <p className="text-xs text-gray-500 font-medium">
@@ -104,8 +227,12 @@ export default function StudentProfile({ currentUser }) {
       <Layout role="admin" currentUser={currentUser}>
         <div className="bg-white rounded-2xl border border-gray-200/80 p-8 shadow-sm max-w-2xl mx-auto">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md">
-              AD
+            <div className="w-16 h-16 rounded-2xl bg-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md overflow-hidden">
+              {currentUser?.avatar ? (
+                <img src={currentUser.avatar} alt="Admin" className="w-full h-full object-cover" />
+              ) : (
+                'AD'
+              )}
             </div>
             <div>
               <h1 className="text-2xl font-extrabold text-gray-900">Administrator</h1>
@@ -134,6 +261,23 @@ export default function StudentProfile({ currentUser }) {
 
   return (
     <Layout role="student" currentUser={currentUser}>
+      {uploadFeedback && (
+        <div
+          className={`mb-4 p-3.5 rounded-xl border text-xs font-semibold flex items-center gap-2.5 transition-all ${
+            uploadFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          {uploadFeedback.type === 'success' ? (
+            <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+          ) : (
+            <AlertCircle size={16} className="shrink-0 text-rose-600" />
+          )}
+          <span>{uploadFeedback.message}</span>
+        </div>
+      )}
+
       {/* Banner */}
       <div className="bg-white rounded-2xl border border-gray-200/80 overflow-hidden shadow-sm mb-8">
         <div className="h-44 bg-gradient-to-r from-indigo-500 via-purple-600 to-indigo-700 relative">
@@ -142,9 +286,7 @@ export default function StudentProfile({ currentUser }) {
 
         <div className="px-8 pb-6 relative flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 -mt-16">
           <div className="flex items-end gap-5">
-            <div className="w-28 h-28 rounded-full border-4 border-white bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white text-3xl font-extrabold shadow-md">
-              {initials}
-            </div>
+            {renderAvatarCircle()}
             <div className="mb-1">
               <h1 className="text-2xl font-extrabold text-gray-900">{name}</h1>
               <p className="text-xs text-gray-500 font-medium">
